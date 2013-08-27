@@ -50,12 +50,12 @@ public final class FDBPostings extends PostingsFormat
     //
 
     @Override
-    public FieldsConsumer fieldsConsumer(SegmentWriteState state) throws IOException {
+    public FieldsConsumer fieldsConsumer(SegmentWriteState state) {
         return new FDBFieldsConsumer(state);
     }
 
     @Override
-    public FieldsProducer fieldsProducer(SegmentReadState state) throws IOException {
+    public FieldsProducer fieldsProducer(SegmentReadState state) {
         return new FDBFieldsProducer(state);
     }
 
@@ -73,7 +73,7 @@ public final class FDBPostings extends PostingsFormat
         private final Tuple segmentTuple;
 
 
-        public FDBFieldsProducer(SegmentReadState state) throws IOException {
+        public FDBFieldsProducer(SegmentReadState state) {
             fieldInfos = state.fieldInfos;
             dir = FDBDirectory.unwrapFDBDirectory(state.directory);
             segmentTuple = dir.subspace.add(state.segmentInfo.name).add(POSTINGS_EXTENSION);
@@ -92,7 +92,7 @@ public final class FDBPostings extends PostingsFormat
         }
 
         @Override
-        synchronized public Terms terms(String field) throws IOException {
+        synchronized public Terms terms(String field) {
             Terms terms = termsCache.get(field);
             if(terms == null) {
                 FieldInfo fieldInfo = fieldInfos.fieldInfo(field);
@@ -400,7 +400,7 @@ public final class FDBPostings extends PostingsFormat
         private final FDBDirectory dir;
         private final Tuple segmentTuple;
 
-        public FDBFieldsConsumer(SegmentWriteState state) throws IOException {
+        public FDBFieldsConsumer(SegmentWriteState state) {
             dir = FDBDirectory.unwrapFDBDirectory(state.directory);
             segmentTuple = dir.subspace.add(state.segmentInfo.name).add(POSTINGS_EXTENSION);
         }

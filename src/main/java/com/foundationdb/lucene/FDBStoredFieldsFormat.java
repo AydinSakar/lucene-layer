@@ -13,16 +13,12 @@ import java.io.IOException;
 public class FDBStoredFieldsFormat extends StoredFieldsFormat
 {
     @Override
-    public StoredFieldsReader fieldsReader(Directory directory,
-                                           SegmentInfo si,
-                                           FieldInfos fn,
-                                           IOContext context) throws IOException {
-        ;
+    public StoredFieldsReader fieldsReader(Directory directory, SegmentInfo si, FieldInfos fn, IOContext context) {
         return new FDBStoredFieldsReader(directory, si, fn, context);
     }
 
     @Override
-    public StoredFieldsWriter fieldsWriter(Directory directory, SegmentInfo si, IOContext context) throws IOException {
+    public StoredFieldsWriter fieldsWriter(Directory directory, SegmentInfo si, IOContext context) {
         return new FDBStoredFieldsWriter(directory, si.name, context);
     }
 }

@@ -13,7 +13,6 @@ import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,12 +47,12 @@ public class FDBFieldInfos extends FieldInfosFormat
     //
 
     @Override
-    public FieldInfosReader getFieldInfosReader() throws IOException {
+    public FieldInfosReader getFieldInfosReader() {
         return reader;
     }
 
     @Override
-    public FieldInfosWriter getFieldInfosWriter() throws IOException {
+    public FieldInfosWriter getFieldInfosWriter() {
         return writer;
     }
 
@@ -65,7 +64,7 @@ public class FDBFieldInfos extends FieldInfosFormat
     private static class Reader extends FieldInfosReader
     {
         @Override
-        public FieldInfos read(Directory directory, String segmentName, IOContext iocontext) throws IOException {
+        public FieldInfos read(Directory directory, String segmentName, IOContext iocontext) {
             FDBDirectory fdbDir = FDBDirectory.unwrapFDBDirectory(directory);
             Transaction txn = fdbDir.txn;
             Tuple tuple = fdbDir.subspace.add(segmentName).add(FIELD_INFOS_EXTENSION);
@@ -127,7 +126,7 @@ public class FDBFieldInfos extends FieldInfosFormat
     private static class Writer extends FieldInfosWriter
     {
         @Override
-        public void write(Directory directory, String segmentName, FieldInfos infos, IOContext context) throws IOException {
+        public void write(Directory directory, String segmentName, FieldInfos infos, IOContext context) {
             FDBDirectory fdbDir = FDBDirectory.unwrapFDBDirectory(directory);
             Transaction txn = fdbDir.txn;
             Tuple tuple = fdbDir.subspace.add(segmentName).add(FIELD_INFOS_EXTENSION);

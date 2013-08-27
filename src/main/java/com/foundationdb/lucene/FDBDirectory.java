@@ -95,15 +95,15 @@ public class FDBDirectory extends Directory
     }
 
     @SuppressWarnings("unused") // Invoked via reflection by tests
-    public FDBDirectory() throws IOException {
+    public FDBDirectory(){
         this(String.format("%d", RND.nextInt()), null, true);
     }
 
-    public FDBDirectory(String path, Transaction txn) throws IOException {
+    public FDBDirectory(String path, Transaction txn) {
         this(path, txn, false);
     }
 
-    private FDBDirectory(String path, Transaction txn, boolean doInit) throws IOException {
+    private FDBDirectory(String path, Transaction txn, boolean doInit) {
         if(doInit) {
             assert txn == null;
             initFDBForTests();
@@ -113,21 +113,28 @@ public class FDBDirectory extends Directory
         this.subspace = Tuple.from("lucene", path);
         this.dirSubspace = subspace.add(0);
         this.dataSubspace = subspace.add(1);
-        setLockFactory(NoLockFactory.getNoLockFactory());
+        try {
+            setLockFactory(NoLockFactory.getNoLockFactory());
+        } catch(IOException e) {
+            throw new IllegalStateException("NoLockFactory through IOException", e);
+        }
     }
 
-    public static FDBDirectory unwrapFDBDirectory(Directory directory) throws IOException {
+    public static FDBDirectory unwrapFDBDirectory(Directory directory) {
         if(directory instanceof FDBDirectory) {
             return (FDBDirectory) directory;
         } else if(directory instanceof CompoundFileDirectory) {
             return unwrapFDBDirectory(((CompoundFileDirectory) directory).getDirectory());
         } else {
+            Exception cause = null;
             try {
                 directory.fileExists(SPECIAL_STRING);
             } catch(TestWorkaroundException e) {
                 return e.getFDBDirectory();
+            } catch(IOException e) {
+                cause = e;
             }
-            throw new IllegalStateException("Expected TestWorkaroundException");
+            throw new IllegalStateException("Expected TestWorkaroundException", cause);
         }
     }
 
@@ -183,8 +190,6 @@ public class FDBDirectory extends Directory
             );
             bytesWritten += toWrite;
         }
-        //System.out.println("Write: " + name);
-        //System.out.println("  byte[" + outValue.length + "]");
         assert bytesWritten == value.length;
         return chunks;
     }
@@ -276,7 +281,7 @@ public class FDBDirectory extends Directory
     }
 
     @Override
-    public String[] listAll() throws IOException {
+    public String[] listAll() {
         List<String> outList = new ArrayList<String>();
         for(KeyValue kv : txn.getRange(dirSubspace.range())) {
             outList.add(Tuple.fromBytes(kv.getKey()).getString(dirSubspace.size()));
@@ -285,7 +290,7 @@ public class FDBDirectory extends Directory
     }
 
     @Override
-    public boolean fileExists(String name) throws IOException {
+    public boolean fileExists(String name) {
         //noinspection StringEquality
         if(name == SPECIAL_STRING) {
             throw new TestWorkaroundException();
@@ -294,7 +299,7 @@ public class FDBDirectory extends Directory
     }
 
     @Override
-    public void deleteFile(String name) throws IOException {
+    public void deleteFile(String name) throws NoSuchFileException {
         long dataID = getDataID(name);
         if(dataID == -1) {
             throw new NoSuchFileException(name);
@@ -309,7 +314,7 @@ public class FDBDirectory extends Directory
     }
 
     @Override
-    public IndexOutput createOutput(String name, IOContext context) throws IOException {
+    public IndexOutput createOutput(String name, IOContext context) throws FileAlreadyExistsException {
         if(getDataID(name) != -1) {
             throw new FileAlreadyExistsException(name);
         }
@@ -317,7 +322,7 @@ public class FDBDirectory extends Directory
     }
 
     @Override
-    public void sync(Collection<String> names) throws IOException {
+    public void sync(Collection<String> names) {
         // None
     }
 

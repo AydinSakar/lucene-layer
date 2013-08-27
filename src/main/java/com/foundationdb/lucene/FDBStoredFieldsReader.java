@@ -37,13 +37,10 @@ public class FDBStoredFieldsReader extends StoredFieldsReader
     private final Tuple segmentTuple;
     private final FieldInfos fieldInfos;
 
-    public FDBStoredFieldsReader(Directory dirIn,
-                                 SegmentInfo segmentInfo,
-                                 FieldInfos fiendInfos,
-                                 IOContext context) throws IOException {
+    public FDBStoredFieldsReader(Directory dirIn, SegmentInfo si, FieldInfos fn, IOContext context) {
         this.dir = FDBDirectory.unwrapFDBDirectory(dirIn);
-        this.segmentTuple = dir.subspace.add(segmentInfo.name).add("fld");
-        this.fieldInfos = fiendInfos;
+        this.segmentTuple = dir.subspace.add(si.name).add("fld");
+        this.fieldInfos = fn;
     }
 
     // used by clone

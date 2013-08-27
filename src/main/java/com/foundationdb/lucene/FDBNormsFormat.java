@@ -22,13 +22,6 @@ public class FDBNormsFormat extends NormsFormat
         return new FDBNormsProducer(state);
     }
 
-    /**
-     * Reads plain-text norms.
-     * <p/>
-     * <b><font color="red">FOR RECREATIONAL USE ONLY</font></B>
-     *
-     * @lucene.experimental
-     */
     public static class FDBNormsProducer extends FDBDocValuesReader
     {
         public FDBNormsProducer(SegmentReadState state) throws IOException {
@@ -38,13 +31,6 @@ public class FDBNormsFormat extends NormsFormat
         }
     }
 
-    /**
-     * Writes plain-text norms.
-     * <p/>
-     * <b><font color="red">FOR RECREATIONAL USE ONLY</font></B>
-     *
-     * @lucene.experimental
-     */
     public static class FDBNormsConsumer extends FDBDocValuesWriter
     {
         public FDBNormsConsumer(SegmentWriteState state) throws IOException {

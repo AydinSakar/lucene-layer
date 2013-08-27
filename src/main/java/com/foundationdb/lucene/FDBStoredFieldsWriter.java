@@ -9,8 +9,6 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.util.BytesRef;
 
-import java.io.IOException;
-
 public class FDBStoredFieldsWriter extends StoredFieldsWriter
 {
     private final FDBDirectory dir;
@@ -29,7 +27,7 @@ public class FDBStoredFieldsWriter extends StoredFieldsWriter
     final static String TYPE_DOUBLE = "double";
 
 
-    public FDBStoredFieldsWriter(Directory dirIn, String segment, IOContext context) throws IOException {
+    public FDBStoredFieldsWriter(Directory dirIn, String segment, IOContext context) {
         this.dir = FDBDirectory.unwrapFDBDirectory(dirIn);
         this.segmentTuple = dir.subspace.add(segment).add("fld");
     }
@@ -49,12 +47,12 @@ public class FDBStoredFieldsWriter extends StoredFieldsWriter
 
 
     @Override
-    public void startDocument(int numStoredFields) throws IOException {
+    public void startDocument(int numStoredFields) {
         docTuple = segmentTuple.add(numDocsWritten++);
     }
 
     @Override
-    public void writeField(FieldInfo info, IndexableField field) throws IOException {
+    public void writeField(FieldInfo info, IndexableField field) {
         final String type;
         final Object value;
         if(field.numericValue() != null) {
