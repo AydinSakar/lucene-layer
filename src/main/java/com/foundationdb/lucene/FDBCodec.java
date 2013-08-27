@@ -13,7 +13,9 @@ import org.apache.lucene.codecs.lucene42.Lucene42Codec;
 
 public final class FDBCodec extends FilterCodec
 {
-    private final PostingsFormat postings = new FDBPostingsFormat();
+    static final String CODEC_NAME = "FDBCodec";
+
+    private final PostingsFormat postings = new FDBPostings();
     private final StoredFieldsFormat storedFields = new FDBStoredFieldsFormat();
     private final SegmentInfoFormat segmentInfos = new FDBSegmentInfoFormat();
     private final FieldInfosFormat fieldInfosFormat = new FDBFieldInfos();
@@ -23,7 +25,7 @@ public final class FDBCodec extends FilterCodec
     private final DocValuesFormat dvFormat = new FDBDocValuesFormat();
 
     public FDBCodec() {
-        super("FDBText", new Lucene42Codec());
+        super(CODEC_NAME, new Lucene42Codec());
     }
 
     @Override
