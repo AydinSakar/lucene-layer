@@ -9,7 +9,7 @@ public final class FDBCodec extends FilterCodec
 
     private final FDBPostings postings = new FDBPostings();
     private final FDBDocValuesFormat dvFormat = new FDBDocValuesFormat();
-    private final FDBStoredFieldsFormat storedFields = new FDBStoredFieldsFormat();
+    private final FDBStoredFields storedFields = new FDBStoredFields();
     private final FDBTermVectorsFormat vectorsFormat = new FDBTermVectorsFormat();
     private final FDBFieldInfos fieldInfosFormat = new FDBFieldInfos();
     private final FDBSegmentInfoFormat segmentInfos = new FDBSegmentInfoFormat();
@@ -32,7 +32,7 @@ public final class FDBCodec extends FilterCodec
     }
 
     @Override
-    public FDBStoredFieldsFormat storedFieldsFormat() {
+    public FDBStoredFields storedFieldsFormat() {
         return storedFields;
     }
 
