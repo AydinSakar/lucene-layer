@@ -21,7 +21,7 @@ public class AllCodecFormatsTest extends SimpleTest
         List<Object[]> params = new ArrayList<Object[]>();
         params.add(new Object[]{ FDBCodec.CONFIG_VALUE_ALL });
         params.add(new Object[]{ FDBCodec.CONFIG_VALUE_NONE });
-        params.add(new Object[]{ FDBCodec.CONFIG_VALUE_FDB });
+        params.add(new Object[]{ FDBCodec.CONFIG_VALUE_DEFAULT });
         return params;
     }
 
