@@ -25,7 +25,7 @@ public class SimpleTest
         // recreate the index on each execution
         config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
         config.setCodec(new FDBCodec());
-        Directory luceneDir = new FDBDirectory();
+        Directory luceneDir = new FDBTestDirectory();
         IndexWriter writer = new IndexWriter(luceneDir, config);
         try {
             writer.addDocument(Arrays.asList(

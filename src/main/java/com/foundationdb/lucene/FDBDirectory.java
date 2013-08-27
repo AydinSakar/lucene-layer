@@ -1,12 +1,8 @@
 package com.foundationdb.lucene;
 
-import com.foundationdb.Cluster;
-import com.foundationdb.Database;
-import com.foundationdb.FDB;
 import com.foundationdb.KeyValue;
 import com.foundationdb.Transaction;
 import com.foundationdb.async.AsyncIterator;
-import com.foundationdb.async.Function;
 import com.foundationdb.tuple.ByteArrayUtil;
 import com.foundationdb.tuple.Tuple;
 import org.apache.lucene.store.CompoundFileDirectory;
@@ -22,22 +18,17 @@ import org.apache.lucene.util.BytesRef;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 
 public class FDBDirectory extends Directory
 {
+    protected static final String ROOT_PREFIX = "lucene";
     private static final String SPECIAL_STRING = new String();
-    private static final Random RND = new Random();
 
     /** See {@link RAMInputStream#BUFFER_SIZE} */
     private static final int BUFFER_SIZE = 1024;
@@ -49,68 +40,9 @@ public class FDBDirectory extends Directory
     private final Tuple dataSubspace;
 
 
-    //
-    // TODO: This should be moved to a test-only class, e.g. FDBTestDirectory, which will init and create txn.
-    //
-    private static FDB fdb;
-    private static Database fdbDB;
-
-    private static ThreadGroup getSystemThreadGroup() {
-        ThreadGroup tg = Thread.currentThread().getThreadGroup();
-        while(tg != null && !"system".equals(tg.getName())) {
-            tg = tg.getParent();
-        }
-        return tg;
-    }
-
-    public static void initFDBForTests() {
-        if(fdb == null) {
-            fdb = FDB.selectAPIVersion(100);
-
-            final ThreadGroup threadGroup = getSystemThreadGroup();
-            ExecutorService executor = Executors.newCachedThreadPool(
-                    new ThreadFactory()
-                    {
-                        @Override
-                        public Thread newThread(Runnable r) {
-                            return new Thread(threadGroup, r);
-                        }
-                    }
-            );
-
-            fdb.startNetwork(executor);
-            Cluster cluster = fdb.createCluster(null, executor);
-            fdbDB = cluster.openDatabase("DB".getBytes(Charset.forName("UTF8")));
-            fdbDB.run(
-                    new Function<Transaction, Void>()
-                    {
-                        @Override
-                        public Void apply(Transaction transaction) {
-                            transaction.clear(Tuple.from("lucene").range());
-                            return null;
-                        }
-                    }
-            );
-        }
-    }
-
-    @SuppressWarnings("unused") // Invoked via reflection by tests
-    public FDBDirectory(){
-        this(String.format("%d", RND.nextInt()), null, true);
-    }
-
     public FDBDirectory(String path, Transaction txn) {
-        this(path, txn, false);
-    }
-
-    private FDBDirectory(String path, Transaction txn, boolean doInit) {
-        if(doInit) {
-            assert txn == null;
-            initFDBForTests();
-            txn = fdbDB.createTransaction();
-        }
         this.txn = txn;
-        this.subspace = Tuple.from("lucene", path);
+        this.subspace = Tuple.from(ROOT_PREFIX, path);
         this.dirSubspace = subspace.add(0);
         this.dataSubspace = subspace.add(1);
         try {
@@ -123,19 +55,19 @@ public class FDBDirectory extends Directory
     public static FDBDirectory unwrapFDBDirectory(Directory directory) {
         if(directory instanceof FDBDirectory) {
             return (FDBDirectory) directory;
-        } else if(directory instanceof CompoundFileDirectory) {
-            return unwrapFDBDirectory(((CompoundFileDirectory) directory).getDirectory());
-        } else {
-            Exception cause = null;
-            try {
-                directory.fileExists(SPECIAL_STRING);
-            } catch(TestWorkaroundException e) {
-                return e.getFDBDirectory();
-            } catch(IOException e) {
-                cause = e;
-            }
-            throw new IllegalStateException("Expected TestWorkaroundException", cause);
         }
+        if(directory instanceof CompoundFileDirectory) {
+            return unwrapFDBDirectory(((CompoundFileDirectory) directory).getDirectory());
+        }
+        Exception cause = null;
+        try {
+            directory.fileExists(SPECIAL_STRING);
+        } catch(TestWorkaroundException e) {
+            return e.getFDBDirectory();
+        } catch(IOException e) {
+            cause = e;
+        }
+        throw new IllegalStateException("Expected TestWorkaroundException", cause);
     }
 
     static byte[] copyRange(BytesRef ref) {
