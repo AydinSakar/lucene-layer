@@ -16,7 +16,7 @@ public final class FDBCodec extends FilterCodec
     private final PostingsFormat postings = new FDBPostingsFormat();
     private final StoredFieldsFormat storedFields = new FDBStoredFieldsFormat();
     private final SegmentInfoFormat segmentInfos = new FDBSegmentInfoFormat();
-    private final FieldInfosFormat fieldInfosFormat = new FDBFieldInfosFormat();
+    private final FieldInfosFormat fieldInfosFormat = new FDBFieldInfos();
     private final TermVectorsFormat vectorsFormat = new FDBTermVectorsFormat();
     private final NormsFormat normsFormat = new FDBNormsFormat();
     private final LiveDocsFormat liveDocs = new FDBLiveDocsFormat();

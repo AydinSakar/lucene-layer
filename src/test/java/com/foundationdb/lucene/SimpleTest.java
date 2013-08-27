@@ -26,24 +26,30 @@ public class SimpleTest
         config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
         config.setCodec(new FDBCodec());
         Directory luceneDir = new FDBDirectory();
-        try (IndexWriter writer = new IndexWriter(luceneDir, config)) {
+        IndexWriter writer = new IndexWriter(luceneDir, config);
+        try {
             writer.addDocument(Arrays.asList(
                     new TextField("title", "The title of my first document", Store.YES),
                     new TextField("content", "The content of the first document", Store.NO)));
-            
+
             writer.addDocument(
                     Arrays.asList(
                             new TextField("title", "The title of the second document", Store.YES),
                             new TextField("content", "And this is the content", Store.NO)
                     )
             );
+        } finally {
+            writer.close();
         }
         assertDocumentsAreThere(luceneDir, 2);
     }
 
     private void assertDocumentsAreThere(Directory dir, int amount) throws IOException {
-        try (IndexReader reader = DirectoryReader.open(dir)) {
+        IndexReader reader = DirectoryReader.open(dir);
+        try {
             assertEquals(amount, reader.numDocs());
+        } finally {
+            reader.close();
         }
     }
 }
