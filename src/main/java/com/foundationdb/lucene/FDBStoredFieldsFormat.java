@@ -20,7 +20,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-public class FDBStoredFields extends StoredFieldsFormat
+public class FDBStoredFieldsFormat extends StoredFieldsFormat
 {
     private final static String STORED_FIELDS_EXTENSION = "fld";
     private final static String TYPE_STRING = "string";

@@ -14,6 +14,11 @@ public class FDBDocValuesFormat extends DocValuesFormat
         super(FDBCodec.CODEC_NAME);
     }
 
+
+    //
+    // DocValuesFormat
+    //
+
     @Override
     public DocValuesConsumer fieldsConsumer(SegmentWriteState state) throws IOException {
         return new FDBDocValuesWriter(state, "dat");

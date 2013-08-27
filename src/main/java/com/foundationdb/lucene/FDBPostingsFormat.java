@@ -33,14 +33,14 @@ import java.util.TreeSet;
 import static com.foundationdb.lucene.FDBDirectory.copyRange;
 import static com.foundationdb.lucene.FDBDirectory.unpackLongForAtomic;
 
-public final class FDBPostings extends PostingsFormat
+public final class FDBPostingsFormat extends PostingsFormat
 {
     private static final String POSTINGS_EXTENSION = "pst";
     private static final byte[] ATOMIC_OP_LONG_0 = { 0, 0, 0, 0, 0, 0, 0, 0 };
     private static final byte[] ATOMIC_OP_LONG_1 = { 1, 0, 0, 0, 0, 0, 0, 0 };
 
 
-    public FDBPostings() {
+    public FDBPostingsFormat() {
         super(FDBCodec.CODEC_NAME);
     }
 

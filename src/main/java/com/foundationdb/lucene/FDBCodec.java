@@ -7,11 +7,11 @@ public final class FDBCodec extends FilterCodec
 {
     static final String CODEC_NAME = FDBCodec.class.getSimpleName();
 
-    private final FDBPostings postings = new FDBPostings();
-    private final FDBDocValuesFormat dvFormat = new FDBDocValuesFormat();
-    private final FDBStoredFields storedFields = new FDBStoredFields();
-    private final FDBTermVectorsFormat vectorsFormat = new FDBTermVectorsFormat();
-    private final FDBFieldInfos fieldInfosFormat = new FDBFieldInfos();
+    private final FDBPostingsFormat postings = new FDBPostingsFormat();
+    private final FDBDocValuesFormat docValues = new FDBDocValuesFormat();
+    private final FDBStoredFieldsFormat storedFields = new FDBStoredFieldsFormat();
+    private final FDBTermVectorsFormat termVectors = new FDBTermVectorsFormat();
+    private final FDBFieldInfos fieldInfos = new FDBFieldInfos();
     private final FDBSegmentInfoFormat segmentInfos = new FDBSegmentInfoFormat();
     private final FDBNormsFormat normsFormat = new FDBNormsFormat();
     private final FDBLiveDocsFormat liveDocs = new FDBLiveDocsFormat();
@@ -22,28 +22,28 @@ public final class FDBCodec extends FilterCodec
     }
 
     @Override
-    public FDBPostings postingsFormat() {
+    public FDBPostingsFormat postingsFormat() {
         return postings;
     }
 
-    @Override
-    public FDBDocValuesFormat docValuesFormat() {
-        return dvFormat;
-    }
+    //@Override
+    //public FDBDocValues docValuesFormat() {
+    //    return docValues;
+    //}
 
     @Override
-    public FDBStoredFields storedFieldsFormat() {
+    public FDBStoredFieldsFormat storedFieldsFormat() {
         return storedFields;
     }
 
     //@Override
     //public TermVectorsFormat termVectorsFormat() {
-    //  return vectorsFormat;
+    //  return termVectors;
     //}
 
     @Override
     public FDBFieldInfos fieldInfosFormat() {
-        return fieldInfosFormat;
+        return fieldInfos;
     }
 
     //@Override
@@ -53,7 +53,7 @@ public final class FDBCodec extends FilterCodec
     //
     //@Override
     //public FDBNormsFormat normsFormat() {
-    //  return normsFormat;
+    //  return norms;
     //}
     //
     //@Override
