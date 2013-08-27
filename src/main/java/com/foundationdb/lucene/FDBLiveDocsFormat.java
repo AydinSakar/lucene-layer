@@ -31,13 +31,13 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
 
     @Override
     public MutableBits newLiveDocs(int size) throws IOException {
-        return new FDBTextMutableBits(size);
+        return new FDBMutableBits(size);
     }
 
     @Override
     public MutableBits newLiveDocs(Bits existing) throws IOException {
-        final FDBTextBits bits = (FDBTextBits) existing;
-        return new FDBTextMutableBits((BitSet) bits.bits.clone(), bits.size);
+        final FDBBits bits = (FDBBits) existing;
+        return new FDBMutableBits((BitSet) bits.bits.clone(), bits.size);
     }
 
     @Override
@@ -67,7 +67,7 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
             }
 
             success = true;
-            return new FDBTextBits(bits, size);
+            return new FDBBits(bits, size);
         } finally {
             if(success) {
                 IOUtils.close(in);
@@ -88,7 +88,7 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
                               SegmentInfoPerCommit info,
                               int newDelCount,
                               IOContext context) throws IOException {
-        BitSet set = ((FDBTextBits) bits).bits;
+        BitSet set = ((FDBBits) bits).bits;
         int size = bits.length();
         BytesRef scratch = new BytesRef();
 
@@ -131,12 +131,12 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
     }
 
     // read-only
-    static class FDBTextBits implements Bits
+    static class FDBBits implements Bits
     {
         final BitSet bits;
         final int size;
 
-        FDBTextBits(BitSet bits, int size) {
+        FDBBits(BitSet bits, int size) {
             this.bits = bits;
             this.size = size;
         }
@@ -153,15 +153,15 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
     }
 
     // read-write
-    static class FDBTextMutableBits extends FDBTextBits implements MutableBits
+    static class FDBMutableBits extends FDBBits implements MutableBits
     {
 
-        FDBTextMutableBits(int size) {
+        FDBMutableBits(int size) {
             this(new BitSet(size), size);
             bits.set(0, size);
         }
 
-        FDBTextMutableBits(BitSet bits, int size) {
+        FDBMutableBits(BitSet bits, int size) {
             super(bits, size);
         }
 
