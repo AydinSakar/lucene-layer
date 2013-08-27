@@ -11,7 +11,7 @@ import java.io.IOException;
 public class FDBDocValuesFormat extends DocValuesFormat
 {
     public FDBDocValuesFormat() {
-        super(FDBCodec.CODEC_NAME);
+        super(FDBDocValuesFormat.class.getSimpleName());
     }
 
 

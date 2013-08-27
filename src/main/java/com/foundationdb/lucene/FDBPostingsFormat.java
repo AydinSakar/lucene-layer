@@ -41,7 +41,7 @@ public final class FDBPostingsFormat extends PostingsFormat
 
 
     public FDBPostingsFormat() {
-        super(FDBCodec.CODEC_NAME);
+        super(FDBPostingsFormat.class.getSimpleName());
     }
 
 
