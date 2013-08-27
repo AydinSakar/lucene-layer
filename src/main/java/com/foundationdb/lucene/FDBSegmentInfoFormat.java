@@ -29,6 +29,10 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
     private static final String FILES = "files";
 
 
+    //
+    // SegmentInfoFormat
+    //
+
     @Override
     public SegmentInfoReader getSegmentInfoReader() {
         return new FDBSegmentInfoReader();
@@ -41,7 +45,7 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
 
 
     //
-    // Reader
+    // SegmentInfoReader
     //
 
     private static class FDBSegmentInfoReader extends SegmentInfoReader
@@ -119,22 +123,8 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
     }
 
     //
-    // Writer
+    // SegmentInfoWriter
     //
-
-    private static void set(Transaction txn, Tuple baseTuple, String key, Object value) {
-        Tuple valueTuple = (value != null) ? Tuple.from(value) : Tuple.from();
-        txn.set(baseTuple.add(key).pack(), valueTuple.pack());
-    }
-
-    private static void writeMap(Transaction txn, Tuple baseTuple, Map<String,String> map) {
-        if(map == null || map.isEmpty()) {
-            return;
-        }
-        for(Map.Entry<String, String> entry : map.entrySet()) {
-            set(txn, baseTuple, entry.getKey(), entry.getValue());
-        }
-    }
 
     private static class FDBSegmentInfoWriter extends SegmentInfoWriter
     {
@@ -159,6 +149,25 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
                     set(txn, fileTuple, fileName, null);
                 }
             }
+        }
+    }
+
+
+    //
+    // Helpers
+    //
+
+    private static void set(Transaction txn, Tuple baseTuple, String key, Object value) {
+        Tuple valueTuple = (value != null) ? Tuple.from(value) : Tuple.from();
+        txn.set(baseTuple.add(key).pack(), valueTuple.pack());
+    }
+
+    private static void writeMap(Transaction txn, Tuple baseTuple, Map<String,String> map) {
+        if(map == null || map.isEmpty()) {
+            return;
+        }
+        for(Map.Entry<String, String> entry : map.entrySet()) {
+            set(txn, baseTuple, entry.getKey(), entry.getValue());
         }
     }
 }

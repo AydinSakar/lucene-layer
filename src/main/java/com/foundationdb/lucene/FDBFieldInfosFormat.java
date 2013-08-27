@@ -18,7 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class FDBFieldInfos extends FieldInfosFormat
+public class FDBFieldInfosFormat extends FieldInfosFormat
 {
     private static final String FIELD_INFOS_EXTENSION = "inf";
     private static final String NUMFIELDS = "number of fields";

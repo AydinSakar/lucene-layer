@@ -45,7 +45,7 @@ public final class FDBCodec extends FilterCodec
         this.docValues = opts.contains(FormatOpts.DOC_VALUES) ? new FDBDocValuesFormat() : super.docValuesFormat();
         this.storedFields = opts.contains(FormatOpts.STORED_FIELDS) ? new FDBStoredFieldsFormat() : super.storedFieldsFormat();
         this.termVectors = opts.contains(FormatOpts.TERM_VECTORS) ? new FDBTermVectorsFormat() : super.termVectorsFormat();
-        this.fieldInfos = opts.contains(FormatOpts.FIELD_INFOS) ? new FDBFieldInfos() : super.fieldInfosFormat();
+        this.fieldInfos = opts.contains(FormatOpts.FIELD_INFOS) ? new FDBFieldInfosFormat() : super.fieldInfosFormat();
         this.segmentInfo = opts.contains(FormatOpts.SEGMENT_INFO) ? new FDBSegmentInfoFormat() : super.segmentInfoFormat();
         this.norms = opts.contains(FormatOpts.NORMS) ? new FDBNormsFormat() : super.normsFormat();
         this.liveDocs = opts.contains(FormatOpts.LIVE_DOCS) ? new FDBLiveDocsFormat() : super.liveDocsFormat();
