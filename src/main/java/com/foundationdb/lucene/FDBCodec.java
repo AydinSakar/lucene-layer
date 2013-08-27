@@ -1,40 +1,38 @@
 package com.foundationdb.lucene;
 
-import org.apache.lucene.codecs.DocValuesFormat;
-import org.apache.lucene.codecs.FieldInfosFormat;
 import org.apache.lucene.codecs.FilterCodec;
-import org.apache.lucene.codecs.LiveDocsFormat;
-import org.apache.lucene.codecs.NormsFormat;
-import org.apache.lucene.codecs.PostingsFormat;
-import org.apache.lucene.codecs.SegmentInfoFormat;
-import org.apache.lucene.codecs.StoredFieldsFormat;
-import org.apache.lucene.codecs.TermVectorsFormat;
 import org.apache.lucene.codecs.lucene42.Lucene42Codec;
 
 public final class FDBCodec extends FilterCodec
 {
-    static final String CODEC_NAME = "FDBCodec";
+    static final String CODEC_NAME = FDBCodec.class.getSimpleName();
 
-    private final PostingsFormat postings = new FDBPostings();
-    private final StoredFieldsFormat storedFields = new FDBStoredFieldsFormat();
-    private final SegmentInfoFormat segmentInfos = new FDBSegmentInfoFormat();
-    private final FieldInfosFormat fieldInfosFormat = new FDBFieldInfos();
-    private final TermVectorsFormat vectorsFormat = new FDBTermVectorsFormat();
-    private final NormsFormat normsFormat = new FDBNormsFormat();
-    private final LiveDocsFormat liveDocs = new FDBLiveDocsFormat();
-    private final DocValuesFormat dvFormat = new FDBDocValuesFormat();
+    private final FDBPostings postings = new FDBPostings();
+    private final FDBDocValuesFormat dvFormat = new FDBDocValuesFormat();
+    private final FDBStoredFieldsFormat storedFields = new FDBStoredFieldsFormat();
+    private final FDBTermVectorsFormat vectorsFormat = new FDBTermVectorsFormat();
+    private final FDBFieldInfos fieldInfosFormat = new FDBFieldInfos();
+    private final FDBSegmentInfoFormat segmentInfos = new FDBSegmentInfoFormat();
+    private final FDBNormsFormat normsFormat = new FDBNormsFormat();
+    private final FDBLiveDocsFormat liveDocs = new FDBLiveDocsFormat();
+
 
     public FDBCodec() {
         super(CODEC_NAME, new Lucene42Codec());
     }
 
     @Override
-    public PostingsFormat postingsFormat() {
+    public FDBPostings postingsFormat() {
         return postings;
     }
 
     @Override
-    public StoredFieldsFormat storedFieldsFormat() {
+    public FDBDocValuesFormat docValuesFormat() {
+        return dvFormat;
+    }
+
+    @Override
+    public FDBStoredFieldsFormat storedFieldsFormat() {
         return storedFields;
     }
 
@@ -44,27 +42,23 @@ public final class FDBCodec extends FilterCodec
     //}
 
     @Override
-    public FieldInfosFormat fieldInfosFormat() {
+    public FDBFieldInfos fieldInfosFormat() {
         return fieldInfosFormat;
     }
 
     //@Override
-    //public SegmentInfoFormat segmentInfoFormat() {
+    //public FDBSegmentInfoFormat segmentInfoFormat() {
     //  return segmentInfos;
     //}
     //
     //@Override
-    //public NormsFormat normsFormat() {
+    //public FDBNormsFormat normsFormat() {
     //  return normsFormat;
     //}
     //
     //@Override
-    //public LiveDocsFormat liveDocsFormat() {
+    //public FDBLiveDocsFormat liveDocsFormat() {
     //  return liveDocs;
     //}
 
-    @Override
-    public DocValuesFormat docValuesFormat() {
-        return dvFormat;
-    }
 }
