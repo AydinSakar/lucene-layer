@@ -330,24 +330,23 @@ public class FDBTermVectorsReader extends TermVectorsReader
         }
 
         @Override
-        public DocsEnum docs(Bits liveDocs, DocsEnum reuse, int flags) throws IOException {
-            // TODO: reuse
-            FDBTermVectorsDocsEnum e = new FDBTermVectorsDocsEnum();
-            e.reset(liveDocs, (flags & DocsEnum.FLAG_FREQS) == 0 ? 1 : current.getValue().freq);
+        public DocsEnum docs(Bits liveDocs, DocsEnum reuse, int flags) {
+            // TODO: reuse?
+            int freq = (flags & DocsEnum.FLAG_FREQS) == 0 ? 1 : current.getValue().freq;
+            FDBTermVectorsDocsAndPositionsEnum e = new FDBTermVectorsDocsAndPositionsEnum();
+            e.reset(freq, liveDocs, null, null, null, null);
             return e;
         }
 
         @Override
-        public DocsAndPositionsEnum docsAndPositions(Bits liveDocs,
-                                                     DocsAndPositionsEnum reuse,
-                                                     int flags) throws IOException {
+        public DocsAndPositionsEnum docsAndPositions(Bits liveDocs, DocsAndPositionsEnum reuse, int flags) {
             FDBTermVectorsPostings postings = current.getValue();
             if(postings.positions == null && postings.startOffsets == null) {
                 return null;
             }
-            // TODO: reuse
+            // TODO: reuse?
             FDBTermVectorsDocsAndPositionsEnum e = new FDBTermVectorsDocsAndPositionsEnum();
-            e.reset(liveDocs, postings.positions, postings.startOffsets, postings.endOffsets, postings.payloads);
+            e.reset(null, liveDocs, postings.positions, postings.startOffsets, postings.endOffsets, postings.payloads);
             return e;
         }
 
@@ -357,55 +356,9 @@ public class FDBTermVectorsReader extends TermVectorsReader
         }
     }
 
-    // note: these two enum classes are exactly like the Default impl...
-    private static class FDBTermVectorsDocsEnum extends DocsEnum
-    {
-        private boolean didNext;
-        private int doc = -1;
-        private int freq;
-        private Bits liveDocs;
-
-        @Override
-        public int freq() throws IOException {
-            assert freq != -1;
-            return freq;
-        }
-
-        @Override
-        public int docID() {
-            return doc;
-        }
-
-        @Override
-        public int nextDoc() {
-            if(!didNext && (liveDocs == null || liveDocs.get(0))) {
-                didNext = true;
-                return (doc = 0);
-            } else {
-                return (doc = NO_MORE_DOCS);
-            }
-        }
-
-        @Override
-        public int advance(int target) throws IOException {
-            return slowAdvance(target);
-        }
-
-        public void reset(Bits liveDocs, int freq) {
-            this.liveDocs = liveDocs;
-            this.freq = freq;
-            this.doc = -1;
-            didNext = false;
-        }
-
-        @Override
-        public long cost() {
-            return 1;
-        }
-    }
-
     private static class FDBTermVectorsDocsAndPositionsEnum extends DocsAndPositionsEnum
     {
+        private Integer freq;
         private boolean didNext;
         private int doc = -1;
         private int nextPos;
@@ -417,12 +370,14 @@ public class FDBTermVectorsReader extends TermVectorsReader
 
         @Override
         public int freq() throws IOException {
+            if(freq != null) {
+                return freq;
+            }
             if(positions != null) {
                 return positions.length;
-            } else {
-                assert startOffsets != null;
-                return startOffsets.length;
             }
+            assert startOffsets != null;
+            return startOffsets.length;
         }
 
         @Override
@@ -445,7 +400,13 @@ public class FDBTermVectorsReader extends TermVectorsReader
             return slowAdvance(target);
         }
 
-        public void reset(Bits liveDocs, int[] positions, int[] startOffsets, int[] endOffsets, BytesRef payloads[]) {
+        public void reset(Integer freq,
+                          Bits liveDocs,
+                          int[] positions,
+                          int[] startOffsets,
+                          int[] endOffsets,
+                          BytesRef payloads[]) {
+            this.freq = freq;
             this.liveDocs = liveDocs;
             this.positions = positions;
             this.startOffsets = startOffsets;
