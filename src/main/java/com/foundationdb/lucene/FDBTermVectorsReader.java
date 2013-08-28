@@ -1,24 +1,18 @@
 package com.foundationdb.lucene;
 
+import com.foundationdb.KeyValue;
+import com.foundationdb.Transaction;
+import com.foundationdb.tuple.Tuple;
 import org.apache.lucene.codecs.TermVectorsReader;
 import org.apache.lucene.index.DocsAndPositionsEnum;
 import org.apache.lucene.index.DocsEnum;
 import org.apache.lucene.index.Fields;
-import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.index.SegmentInfo;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
-import org.apache.lucene.store.AlreadyClosedException;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.IOContext;
-import org.apache.lucene.store.IndexInput;
-import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
-import org.apache.lucene.util.CharsRef;
-import org.apache.lucene.util.IOUtils;
-import org.apache.lucene.util.StringHelper;
-import org.apache.lucene.util.UnicodeUtil;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -28,213 +22,203 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import static com.foundationdb.lucene.FDBTermVectorsWriter.DOC;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.END;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.ENDOFFSET;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.FIELD;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.FIELDNAME;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.FIELDOFFSETS;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.FIELDPAYLOADS;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.FIELDPOSITIONS;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.FIELDTERMCOUNT;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.NUMFIELDS;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.PAYLOAD;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.POSITION;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.STARTOFFSET;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.TERMFREQ;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.TERMTEXT;
-import static com.foundationdb.lucene.FDBTermVectorsWriter.VECTORS_EXTENSION;
+import static com.foundationdb.lucene.FDBTermVectorsWriter.*;
 
 public class FDBTermVectorsReader extends TermVectorsReader
 {
-    private long offsets[]; /* docid -> offset in .vec file */
-    private IndexInput in;
-    private BytesRef scratch = new BytesRef();
-    private CharsRef scratchUTF16 = new CharsRef();
+    private final FDBDirectory dir;
+    private final Tuple segmentTuple;
 
-    public FDBTermVectorsReader(Directory directory, SegmentInfo si, IOContext context) throws IOException {
-        boolean success = false;
-        try {
-            in = directory.openInput(IndexFileNames.segmentFileName(si.name, "", VECTORS_EXTENSION), context);
-            success = true;
-        } finally {
-            if(!success) {
-                try {
-                    close();
-                } catch(Throwable t) {
-                } // ensure we throw our original exception
-            }
-        }
-        readIndex(si.getDocCount());
+    public FDBTermVectorsReader(Directory dirIn, SegmentInfo si) {
+        this.dir = FDBDirectory.unwrapFDBDirectory(dirIn);
+        this.segmentTuple = dir.subspace.add(si.name).add(VECTORS_EXTENSION);
     }
 
     // used by clone
-    FDBTermVectorsReader(long offsets[], IndexInput in) {
-        this.offsets = offsets;
-        this.in = in;
+    FDBTermVectorsReader(FDBDirectory dir, Tuple segmentTuple) {
+        this.dir = dir;
+        this.segmentTuple = segmentTuple;
     }
 
-    // we don't actually write a .tvx-like index, instead we read the
-    // vectors file in entirety up-front and save the offsets
-    // so we can seek to the data later.
-    private void readIndex(int maxDoc) throws IOException {
-        offsets = new long[maxDoc];
-        int upto = 0;
-        while(!scratch.equals(END)) {
-            readLine();
-            if(StringHelper.startsWith(scratch, DOC)) {
-                offsets[upto] = in.getFilePointer();
-                upto++;
-            }
+    private static class FieldBuilder
+    {
+        int num;
+        String name;
+        Boolean withPositions;
+        Boolean withOffsets;
+        Boolean withPayloads;
+        FDBTVTerms terms;
+
+        public FieldBuilder(int num) {
+            this.num = num;
         }
-        assert upto == offsets.length;
     }
 
     @Override
     public Fields get(int doc) throws IOException {
-        SortedMap<String, SimpleTVTerms> fields = new TreeMap<String, SimpleTVTerms>();
-        in.seek(offsets[doc]);
-        readLine();
-        assert StringHelper.startsWith(scratch, NUMFIELDS);
-        int numFields = parseIntAt(NUMFIELDS.length);
-        if(numFields == 0) {
-            return null; // no vectors for this doc
+        final Tuple docTuple = segmentTuple.add(doc);
+
+        SortedMap<String, FDBTVTerms> fields = new TreeMap<String, FDBTVTerms>();
+
+        Transaction txn = dir.txn;
+        Iterator<KeyValue> it = txn.getRange(docTuple.range()).iterator();
+
+        FieldBuilder builder = null;
+
+        KeyValue kv = null;
+        for(; ; ) {
+            if(kv == null) {
+                if(!it.hasNext()) {
+                    break;
+                }
+                kv = it.next();
+            }
+            Tuple keyTuple = Tuple.fromBytes(kv.getKey());
+            Tuple valueTuple = Tuple.fromBytes(kv.getValue());
+
+            int fieldNum = (int)keyTuple.getLong(docTuple.size());
+            String part = keyTuple.getString(docTuple.size() + 1);
+
+            if(builder == null) {
+                builder = new FieldBuilder(fieldNum);
+            } else if(fieldNum != builder.num) {
+                fields.put(builder.name, builder.terms);
+                builder = new FieldBuilder(fieldNum);
+            }
+            if(FIELD_NAME.equals(part)) {
+                builder.name = valueTuple.getString(0);
+            } else if(FIELD_POSITIONS.equals(part)) {
+                builder.withPositions = valueTuple.getLong(0) == 1;
+            } else if(FIELD_OFFSETS.equals(part)) {
+                builder.withOffsets = valueTuple.getLong(0) == 1;
+            } else if(FIELD_PAYLOADS.equals(part)) {
+                builder.withPayloads = valueTuple.getLong(0) == 1;
+            } else if(TERM.equals(part)) {
+                kv = loadTerms(it, docTuple.size(), builder, kv);
+                continue;
+            } else {
+                throw new IllegalStateException("Unexpected data part: " + part);
+            }
+            kv = null;
         }
-        for(int i = 0; i < numFields; i++) {
-            readLine();
-            assert StringHelper.startsWith(scratch, FIELD);
-            // skip fieldNumber:
-            parseIntAt(FIELD.length);
 
-            readLine();
-            assert StringHelper.startsWith(scratch, FIELDNAME);
-            String fieldName = readString(FIELDNAME.length, scratch);
+        if(builder != null) {
+            fields.put(builder.name, builder.terms);
+            builder = null;
+        }
 
-            readLine();
-            assert StringHelper.startsWith(scratch, FIELDPOSITIONS);
-            boolean positions = Boolean.parseBoolean(readString(FIELDPOSITIONS.length, scratch));
+        return new FDBTVFields(fields);
+    }
 
-            readLine();
-            assert StringHelper.startsWith(scratch, FIELDOFFSETS);
-            boolean offsets = Boolean.parseBoolean(readString(FIELDOFFSETS.length, scratch));
+    private static KeyValue loadTerms(Iterator<KeyValue> it, int fieldNumIndex, FieldBuilder builder, KeyValue initKV) {
+        final int FIELD_PART_INDEX = fieldNumIndex + 1;
+        final int TERM_NUM_INDEX = fieldNumIndex + 2;
+        final int TERM_POS_INDEX = fieldNumIndex + 3;
+        final int TERM_POS_PART_INDEX = fieldNumIndex + 4;
 
-            readLine();
-            assert StringHelper.startsWith(scratch, FIELDPAYLOADS);
-            boolean payloads = Boolean.parseBoolean(readString(FIELDPAYLOADS.length, scratch));
+        builder.terms = new FDBTVTerms(builder.withOffsets, builder.withPositions, builder.withPayloads);
 
-            readLine();
-            assert StringHelper.startsWith(scratch, FIELDTERMCOUNT);
-            int termCount = parseIntAt(FIELDTERMCOUNT.length);
+        int lastTermNum = -1;
+        int posIndex = -1;
+        FDBTVPostings postings = null;
 
-            SimpleTVTerms terms = new SimpleTVTerms(offsets, positions, payloads);
-            fields.put(fieldName, terms);
+        boolean first = true;
+        for(; ; ) {
+            final KeyValue kv;
+            if(first) {
+                kv = initKV;
+                first = false;
+            } else {
+                if(!it.hasNext()) {
+                    return null;
+                }
+                kv = it.next();
+            }
 
-            for(int j = 0; j < termCount; j++) {
-                readLine();
-                assert StringHelper.startsWith(scratch, TERMTEXT);
-                BytesRef term = new BytesRef();
-                int termLength = scratch.length - TERMTEXT.length;
-                term.grow(termLength);
-                term.length = termLength;
-                System.arraycopy(scratch.bytes, scratch.offset + TERMTEXT.length, term.bytes, term.offset, termLength);
+            Tuple keyTuple = Tuple.fromBytes(kv.getKey());
+            Tuple valueTuple = Tuple.fromBytes(kv.getValue());
 
-                SimpleTVPostings postings = new SimpleTVPostings();
-                terms.terms.put(term, postings);
+            int fieldNum = (int)keyTuple.getLong(fieldNumIndex);
+            if(fieldNum != builder.num) {
+                return kv;
+            }
 
-                readLine();
-                assert StringHelper.startsWith(scratch, TERMFREQ);
-                postings.freq = parseIntAt(TERMFREQ.length);
+            assert TERM.equals(keyTuple.getString(FIELD_PART_INDEX));
 
-                if(positions || offsets) {
-                    if(positions) {
-                        postings.positions = new int[postings.freq];
-                        if(payloads) {
-                            postings.payloads = new BytesRef[postings.freq];
-                        }
+            int termNum = (int)keyTuple.getLong(TERM_NUM_INDEX);
+
+            if(termNum != lastTermNum) {
+                assert (lastTermNum == -1) == (postings == null);
+                // Should always see metadata key first
+                assert keyTuple.size() == (TERM_NUM_INDEX + 1);
+                lastTermNum = termNum;
+                posIndex = -1;
+
+                BytesRef term = new BytesRef(valueTuple.getBytes(0));
+                postings = new FDBTVPostings();
+                postings.freq = (int)valueTuple.getLong(1);
+                builder.terms.terms.put(term, postings);
+
+                if(builder.withPositions) {
+                    postings.positions = new int[postings.freq];
+                    if(builder.withPayloads) {
+                        postings.payloads = new BytesRef[postings.freq];
                     }
+                }
 
-                    if(offsets) {
-                        postings.startOffsets = new int[postings.freq];
-                        postings.endOffsets = new int[postings.freq];
+                if(builder.withOffsets) {
+                    postings.startOffsets = new int[postings.freq];
+                    postings.endOffsets = new int[postings.freq];
+                }
+            } else {
+                // Position data
+                assert builder.withPositions || builder.withOffsets;
+
+                int posNum = (int)keyTuple.getLong(TERM_POS_INDEX);
+                if(keyTuple.size() == TERM_POS_INDEX + 1) {
+                    ++posIndex;
+                    postings.positions[posIndex] = posNum;
+                } else if(keyTuple.size() == TERM_POS_PART_INDEX + 1) {
+                    String part = keyTuple.getString(TERM_POS_PART_INDEX);
+                    if(PAYLOAD.equals(part)) {
+                        assert builder.withPayloads;
+                        postings.payloads[posIndex] = valueTuple.size() == 0 ? null : new BytesRef(valueTuple.getBytes(0));
+                    } else if(START_OFFSET.equals(part)) {
+                        assert builder.withOffsets;
+                        postings.startOffsets[posIndex] = (int)valueTuple.getLong(0);
+                    } else if(END_OFFSET.equals(part)) {
+                        assert builder.withOffsets;
+                        postings.endOffsets[posIndex] = (int)valueTuple.getLong(0);
+                    } else {
+                        throw new IllegalStateException("Unexpected position info: " + part);
                     }
-
-                    for(int k = 0; k < postings.freq; k++) {
-                        if(positions) {
-                            readLine();
-                            assert StringHelper.startsWith(scratch, POSITION);
-                            postings.positions[k] = parseIntAt(POSITION.length);
-                            if(payloads) {
-                                readLine();
-                                assert StringHelper.startsWith(scratch, PAYLOAD);
-                                if(scratch.length - PAYLOAD.length == 0) {
-                                    postings.payloads[k] = null;
-                                } else {
-                                    byte payloadBytes[] = new byte[scratch.length - PAYLOAD.length];
-                                    System.arraycopy(
-                                            scratch.bytes,
-                                            scratch.offset + PAYLOAD.length,
-                                            payloadBytes,
-                                            0,
-                                            payloadBytes.length
-                                    );
-                                    postings.payloads[k] = new BytesRef(payloadBytes);
-                                }
-                            }
-                        }
-
-                        if(offsets) {
-                            readLine();
-                            assert StringHelper.startsWith(scratch, STARTOFFSET);
-                            postings.startOffsets[k] = parseIntAt(STARTOFFSET.length);
-
-                            readLine();
-                            assert StringHelper.startsWith(scratch, ENDOFFSET);
-                            postings.endOffsets[k] = parseIntAt(ENDOFFSET.length);
-                        }
-                    }
+                } else {
+                    throw new IllegalStateException("Unexpected keyTuple size: " + keyTuple.size());
                 }
             }
         }
-        return new SimpleTVFields(fields);
     }
+
 
     @Override
     public TermVectorsReader clone() {
-        if(in == null) {
-            throw new AlreadyClosedException("this TermVectorsReader is closed");
-        }
-        return new FDBTermVectorsReader(offsets, in.clone());
+        // TODO: needed?
+        //if(in == null) {
+        //    throw new AlreadyClosedException("this TermVectorsReader is closed");
+        //}
+        return new FDBTermVectorsReader(dir, segmentTuple);
     }
 
     @Override
-    public void close() throws IOException {
-        try {
-            IOUtils.close(in);
-        } finally {
-            in = null;
-            offsets = null;
-        }
+    public void close() {
+        // None
     }
 
-    private void readLine() throws IOException {
-        FDBUtil.readLine(in, scratch);
-    }
-
-    private int parseIntAt(int offset) {
-        UnicodeUtil.UTF8toUTF16(scratch.bytes, scratch.offset + offset, scratch.length - offset, scratchUTF16);
-        return ArrayUtil.parseInt(scratchUTF16.chars, 0, scratchUTF16.length);
-    }
-
-    private String readString(int offset, BytesRef scratch) {
-        UnicodeUtil.UTF8toUTF16(scratch.bytes, scratch.offset + offset, scratch.length - offset, scratchUTF16);
-        return scratchUTF16.toString();
-    }
-
-    private class SimpleTVFields extends Fields
+    private class FDBTVFields extends Fields
     {
-        private final SortedMap<String, SimpleTVTerms> fields;
+        private final SortedMap<String, FDBTVTerms> fields;
 
-        SimpleTVFields(SortedMap<String, SimpleTVTerms> fields) {
+        FDBTVFields(SortedMap<String, FDBTVTerms> fields) {
             this.fields = fields;
         }
 
@@ -254,24 +238,24 @@ public class FDBTermVectorsReader extends TermVectorsReader
         }
     }
 
-    private static class SimpleTVTerms extends Terms
+    private static class FDBTVTerms extends Terms
     {
-        final SortedMap<BytesRef, SimpleTVPostings> terms;
+        final SortedMap<BytesRef, FDBTVPostings> terms;
         final boolean hasOffsets;
         final boolean hasPositions;
         final boolean hasPayloads;
 
-        SimpleTVTerms(boolean hasOffsets, boolean hasPositions, boolean hasPayloads) {
+        FDBTVTerms(boolean hasOffsets, boolean hasPositions, boolean hasPayloads) {
             this.hasOffsets = hasOffsets;
             this.hasPositions = hasPositions;
             this.hasPayloads = hasPayloads;
-            terms = new TreeMap<BytesRef, SimpleTVPostings>();
+            terms = new TreeMap<BytesRef, FDBTVPostings>();
         }
 
         @Override
         public TermsEnum iterator(TermsEnum reuse) throws IOException {
             // TODO: reuse
-            return new SimpleTVTermsEnum(terms);
+            return new FDBTVTermsEnum(terms);
         }
 
         @Override
@@ -315,7 +299,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
         }
     }
 
-    private static class SimpleTVPostings
+    private static class FDBTVPostings
     {
         private int freq;
         private int positions[];
@@ -324,13 +308,13 @@ public class FDBTermVectorsReader extends TermVectorsReader
         private BytesRef payloads[];
     }
 
-    private static class SimpleTVTermsEnum extends TermsEnum
+    private static class FDBTVTermsEnum extends TermsEnum
     {
-        SortedMap<BytesRef, SimpleTVPostings> terms;
-        Iterator<Map.Entry<BytesRef, FDBTermVectorsReader.SimpleTVPostings>> iterator;
-        Map.Entry<BytesRef, FDBTermVectorsReader.SimpleTVPostings> current;
+        private final SortedMap<BytesRef, FDBTVPostings> terms;
+        private Iterator<Map.Entry<BytesRef, FDBTVPostings>> iterator;
+        private Map.Entry<BytesRef, FDBTVPostings> current;
 
-        SimpleTVTermsEnum(SortedMap<BytesRef, SimpleTVPostings> terms) {
+        FDBTVTermsEnum(SortedMap<BytesRef, FDBTVPostings> terms) {
             this.terms = terms;
             this.iterator = terms.entrySet().iterator();
         }
@@ -383,7 +367,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
         @Override
         public DocsEnum docs(Bits liveDocs, DocsEnum reuse, int flags) throws IOException {
             // TODO: reuse
-            SimpleTVDocsEnum e = new SimpleTVDocsEnum();
+            FDBTVDocsEnum e = new FDBTVDocsEnum();
             e.reset(liveDocs, (flags & DocsEnum.FLAG_FREQS) == 0 ? 1 : current.getValue().freq);
             return e;
         }
@@ -392,12 +376,12 @@ public class FDBTermVectorsReader extends TermVectorsReader
         public DocsAndPositionsEnum docsAndPositions(Bits liveDocs,
                                                      DocsAndPositionsEnum reuse,
                                                      int flags) throws IOException {
-            SimpleTVPostings postings = current.getValue();
+            FDBTVPostings postings = current.getValue();
             if(postings.positions == null && postings.startOffsets == null) {
                 return null;
             }
             // TODO: reuse
-            SimpleTVDocsAndPositionsEnum e = new SimpleTVDocsAndPositionsEnum();
+            FDBTVDocsAndPositionsEnum e = new FDBTVDocsAndPositionsEnum();
             e.reset(liveDocs, postings.positions, postings.startOffsets, postings.endOffsets, postings.payloads);
             return e;
         }
@@ -409,7 +393,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
     }
 
     // note: these two enum classes are exactly like the Default impl...
-    private static class SimpleTVDocsEnum extends DocsEnum
+    private static class FDBTVDocsEnum extends DocsEnum
     {
         private boolean didNext;
         private int doc = -1;
@@ -455,7 +439,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
         }
     }
 
-    private static class SimpleTVDocsAndPositionsEnum extends DocsAndPositionsEnum
+    private static class FDBTVDocsAndPositionsEnum extends DocsAndPositionsEnum
     {
         private boolean didNext;
         private int doc = -1;
