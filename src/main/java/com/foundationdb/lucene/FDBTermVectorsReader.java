@@ -47,7 +47,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
         Boolean withPositions;
         Boolean withOffsets;
         Boolean withPayloads;
-        FDBTVTerms terms;
+        TermVectorTerms terms;
 
         public FieldBuilder(int num) {
             this.num = num;
@@ -58,7 +58,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
     public Fields get(int doc) throws IOException {
         final Tuple docTuple = segmentTuple.add(doc);
 
-        SortedMap<String, FDBTVTerms> fields = new TreeMap<String, FDBTVTerms>();
+        SortedMap<String, TermVectorTerms> fields = new TreeMap<String, TermVectorTerms>();
 
         Transaction txn = dir.txn;
         Iterator<KeyValue> it = txn.getRange(docTuple.range()).iterator();
@@ -107,7 +107,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
             builder = null;
         }
 
-        return new FDBTVFields(fields);
+        return new TermVectorFields(fields);
     }
 
     private static KeyValue loadTerms(Iterator<KeyValue> it, int fieldNumIndex, FieldBuilder builder, KeyValue initKV) {
@@ -116,11 +116,12 @@ public class FDBTermVectorsReader extends TermVectorsReader
         final int TERM_POS_INDEX = fieldNumIndex + 3;
         final int TERM_POS_PART_INDEX = fieldNumIndex + 4;
 
-        builder.terms = new FDBTVTerms(builder.withOffsets, builder.withPositions, builder.withPayloads);
+        final KeyValue outKV;
 
         int lastTermNum = -1;
         int posIndex = -1;
-        FDBTVPostings postings = null;
+        FDBTermVectorsPostings postings = null;
+        final SortedMap<BytesRef, FDBTermVectorsPostings> terms = new TreeMap<BytesRef, FDBTermVectorsPostings>();
 
         boolean first = true;
         for(; ; ) {
@@ -130,7 +131,8 @@ public class FDBTermVectorsReader extends TermVectorsReader
                 first = false;
             } else {
                 if(!it.hasNext()) {
-                    return null;
+                    outKV = null;
+                    break;
                 }
                 kv = it.next();
             }
@@ -140,7 +142,8 @@ public class FDBTermVectorsReader extends TermVectorsReader
 
             int fieldNum = (int)keyTuple.getLong(fieldNumIndex);
             if(fieldNum != builder.num) {
-                return kv;
+                outKV = kv;
+                break;
             }
 
             assert TERM.equals(keyTuple.getString(FIELD_PART_INDEX));
@@ -149,15 +152,16 @@ public class FDBTermVectorsReader extends TermVectorsReader
 
             if(termNum != lastTermNum) {
                 assert (lastTermNum == -1) == (postings == null);
+
                 // Should always see metadata key first
                 assert keyTuple.size() == (TERM_NUM_INDEX + 1);
                 lastTermNum = termNum;
                 posIndex = -1;
 
                 BytesRef term = new BytesRef(valueTuple.getBytes(0));
-                postings = new FDBTVPostings();
+                postings = new FDBTermVectorsPostings();
                 postings.freq = (int)valueTuple.getLong(1);
-                builder.terms.terms.put(term, postings);
+                terms.put(term, postings);
 
                 if(builder.withPositions) {
                     postings.positions = new int[postings.freq];
@@ -197,9 +201,13 @@ public class FDBTermVectorsReader extends TermVectorsReader
                 }
             }
         }
+
+        builder.terms = new TermVectorTerms(builder.withOffsets, builder.withPositions, builder.withPayloads, terms);
+        return outKV;
     }
 
 
+    @SuppressWarnings("CloneDoesntCallSuperClone")
     @Override
     public TermVectorsReader clone() {
         // TODO: needed?
@@ -214,11 +222,11 @@ public class FDBTermVectorsReader extends TermVectorsReader
         // None
     }
 
-    private class FDBTVFields extends Fields
+    private class TermVectorFields extends Fields
     {
-        private final SortedMap<String, FDBTVTerms> fields;
+        private final SortedMap<String, TermVectorTerms> fields;
 
-        FDBTVFields(SortedMap<String, FDBTVTerms> fields) {
+        TermVectorFields(SortedMap<String, TermVectorTerms> fields) {
             this.fields = fields;
         }
 
@@ -238,68 +246,25 @@ public class FDBTermVectorsReader extends TermVectorsReader
         }
     }
 
-    private static class FDBTVTerms extends Terms
+    private static class TermVectorTerms extends FDBTermsBase
     {
-        final SortedMap<BytesRef, FDBTVPostings> terms;
-        final boolean hasOffsets;
-        final boolean hasPositions;
-        final boolean hasPayloads;
+        final SortedMap<BytesRef, FDBTermVectorsPostings> terms;
 
-        FDBTVTerms(boolean hasOffsets, boolean hasPositions, boolean hasPayloads) {
-            this.hasOffsets = hasOffsets;
-            this.hasPositions = hasPositions;
-            this.hasPayloads = hasPayloads;
-            terms = new TreeMap<BytesRef, FDBTVPostings>();
+        public TermVectorTerms(boolean hasOffsets,
+                               boolean hasPositions,
+                               boolean hasPayloads,
+                               SortedMap<BytesRef, FDBTermVectorsPostings> terms) {
+            super(hasOffsets, hasPositions, hasPayloads, terms.size(), -1, 1);
+            this.terms = terms;
         }
 
         @Override
         public TermsEnum iterator(TermsEnum reuse) throws IOException {
-            // TODO: reuse
-            return new FDBTVTermsEnum(terms);
-        }
-
-        @Override
-        public Comparator<BytesRef> getComparator() {
-            return BytesRef.getUTF8SortedAsUnicodeComparator();
-        }
-
-        @Override
-        public long size() throws IOException {
-            return terms.size();
-        }
-
-        @Override
-        public long getSumTotalTermFreq() throws IOException {
-            return -1;
-        }
-
-        @Override
-        public long getSumDocFreq() throws IOException {
-            return terms.size();
-        }
-
-        @Override
-        public int getDocCount() throws IOException {
-            return 1;
-        }
-
-        @Override
-        public boolean hasOffsets() {
-            return hasOffsets;
-        }
-
-        @Override
-        public boolean hasPositions() {
-            return hasPositions;
-        }
-
-        @Override
-        public boolean hasPayloads() {
-            return hasPayloads;
+            return new FDBTermVectorsTermsEnum(terms);
         }
     }
 
-    private static class FDBTVPostings
+    private static class FDBTermVectorsPostings
     {
         private int freq;
         private int positions[];
@@ -308,13 +273,13 @@ public class FDBTermVectorsReader extends TermVectorsReader
         private BytesRef payloads[];
     }
 
-    private static class FDBTVTermsEnum extends TermsEnum
+    private static class FDBTermVectorsTermsEnum extends TermsEnum
     {
-        private final SortedMap<BytesRef, FDBTVPostings> terms;
-        private Iterator<Map.Entry<BytesRef, FDBTVPostings>> iterator;
-        private Map.Entry<BytesRef, FDBTVPostings> current;
+        private final SortedMap<BytesRef, FDBTermVectorsPostings> terms;
+        private Iterator<Map.Entry<BytesRef, FDBTermVectorsPostings>> iterator;
+        private Map.Entry<BytesRef, FDBTermVectorsPostings> current;
 
-        FDBTVTermsEnum(SortedMap<BytesRef, FDBTVPostings> terms) {
+        FDBTermVectorsTermsEnum(SortedMap<BytesRef, FDBTermVectorsPostings> terms) {
             this.terms = terms;
             this.iterator = terms.entrySet().iterator();
         }
@@ -367,7 +332,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
         @Override
         public DocsEnum docs(Bits liveDocs, DocsEnum reuse, int flags) throws IOException {
             // TODO: reuse
-            FDBTVDocsEnum e = new FDBTVDocsEnum();
+            FDBTermVectorsDocsEnum e = new FDBTermVectorsDocsEnum();
             e.reset(liveDocs, (flags & DocsEnum.FLAG_FREQS) == 0 ? 1 : current.getValue().freq);
             return e;
         }
@@ -376,12 +341,12 @@ public class FDBTermVectorsReader extends TermVectorsReader
         public DocsAndPositionsEnum docsAndPositions(Bits liveDocs,
                                                      DocsAndPositionsEnum reuse,
                                                      int flags) throws IOException {
-            FDBTVPostings postings = current.getValue();
+            FDBTermVectorsPostings postings = current.getValue();
             if(postings.positions == null && postings.startOffsets == null) {
                 return null;
             }
             // TODO: reuse
-            FDBTVDocsAndPositionsEnum e = new FDBTVDocsAndPositionsEnum();
+            FDBTermVectorsDocsAndPositionsEnum e = new FDBTermVectorsDocsAndPositionsEnum();
             e.reset(liveDocs, postings.positions, postings.startOffsets, postings.endOffsets, postings.payloads);
             return e;
         }
@@ -393,7 +358,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
     }
 
     // note: these two enum classes are exactly like the Default impl...
-    private static class FDBTVDocsEnum extends DocsEnum
+    private static class FDBTermVectorsDocsEnum extends DocsEnum
     {
         private boolean didNext;
         private int doc = -1;
@@ -439,7 +404,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
         }
     }
 
-    private static class FDBTVDocsAndPositionsEnum extends DocsAndPositionsEnum
+    private static class FDBTermVectorsDocsAndPositionsEnum extends DocsAndPositionsEnum
     {
         private boolean didNext;
         private int doc = -1;

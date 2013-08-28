@@ -16,7 +16,7 @@ import java.util.List;
 @RunWith(Parameterized.class)
 public class AllCodecFormatsTest extends SimpleTest
 {
-    @Parameters(name="{0}")
+    @Parameters//(name="{0}")
     public static Collection<Object[]> params() {
         List<Object[]> params = new ArrayList<Object[]>();
         params.add(new Object[]{ FDBCodec.CONFIG_VALUE_ALL });
