@@ -14,15 +14,6 @@ import java.util.Comparator;
 public class FDBTermVectorsWriter extends TermVectorsWriter
 {
     static final String VECTORS_EXTENSION = "vec";
-    static final String FIELD_NAME = "name";
-    static final String FIELD_POSITIONS = "positions";
-    static final String FIELD_OFFSETS = "offsets";
-    static final String FIELD_PAYLOADS = "payloads";
-    static final String TERM = "term";
-    static final String PAYLOAD = "payload";
-    static final String START_OFFSET = "startoffset";
-    static final String END_OFFSET = "endoffset";
-
 
     private final FDBDirectory dir;
     private final Tuple segmentTuple;
@@ -33,9 +24,9 @@ public class FDBTermVectorsWriter extends TermVectorsWriter
     private Tuple fieldTuple;
     private Tuple termTuple;
 
-    private boolean withPositions;
-    private boolean withOffsets;
-    private boolean withPayloads;
+    private boolean hasPositions;
+    private boolean hasOffsets;
+    private boolean hasPayloads;
 
 
     public FDBTermVectorsWriter(Directory dirIn, String segmentName) {
@@ -51,16 +42,12 @@ public class FDBTermVectorsWriter extends TermVectorsWriter
 
 
     //
-    // (segmentName, "vec", docNum, fieldNum, "name") => name
-    // (segmentName, "vec", docNum, fieldNum, "positions") => [0|1]
-    // (segmentName, "vec", docNum, fieldNum, "offets") => [0|1]
-    // (segmentName, "vec", docNum, fieldNum, "payloads") => [0|1]
-    // (segmentName, "vec", docNum, fieldNum, "term", 0) => (termBytes, freq)
-    // (segmentName, "vec", docNum, fieldNum, "term", 0, posNum) => ()
-    // (segmentName, "vec", docNum, fieldNum, "term", 0, posNum, "payload") => [payload]
-    // (segmentName, "vec", docNum, fieldNum, "term", 0, posNum, "startoffset") => startOffset
-    // (segmentName, "vec", docNum, fieldNum, "term", 0, posNum, "endOffset") => endOffset
-    // (segmentName, "vec", docNum, fieldNum, "term", 1) => (termBytes, freq)
+    // (segmentName, "vec", docNum, fieldNum) => (name, hasPositions, hasOffsets, hasPayloads)
+    // (segmentName, "vec", docNum, fieldNum, term0) => (termBytes, freq)
+    // (segmentName, "vec", docNum, fieldNum, term0, posNum0) => (start_offset, end_offset, payload)
+    // (segmentName, "vec", docNum, fieldNum, term0, posNum1) => (start_offset, end_offset, payload)
+    // (segmentName, "vec", docNum, fieldNum, term1) => (termBytes, freq)
+    // ...
     //
 
     @Override
@@ -68,42 +55,30 @@ public class FDBTermVectorsWriter extends TermVectorsWriter
         fieldTuple = docTuple.add(info.number);
         Transaction txn = dir.txn;
 
-        txn.set(fieldTuple.add(FIELD_NAME).pack(), Tuple.from(info.name).pack());
-        txn.set(fieldTuple.add(FIELD_POSITIONS).pack(), Tuple.from(positions ? 1 : 0).pack());
-        txn.set(fieldTuple.add(FIELD_OFFSETS).pack(), Tuple.from(offsets ? 1 : 0).pack());
-        txn.set(fieldTuple.add(FIELD_PAYLOADS).pack(), Tuple.from(payloads ? 1 : 0).pack());
+        txn.set(fieldTuple.pack(), Tuple.from(info.name, positions ? 1 : 0, offsets ? 1 : 0, payloads ? 1 : 0).pack());
 
-        withPositions = positions;
-        withOffsets = offsets;
-        withPayloads = payloads;
+        hasPositions = positions;
+        hasOffsets = offsets;
+        hasPayloads = payloads;
         numTermsWritten = 0;
     }
 
     @Override
     public void startTerm(BytesRef term, int freq) throws IOException {
-        termTuple = fieldTuple.add(TERM).add(numTermsWritten);
+        termTuple = fieldTuple.add(numTermsWritten);
         dir.txn.set(termTuple.pack(), Tuple.from(FDBDirectory.copyRange(term), freq).pack());
         ++numTermsWritten;
     }
 
     @Override
     public void addPosition(int position, int startOffset, int endOffset, BytesRef payload) {
-        assert withPositions || withOffsets;
-
         Transaction txn = dir.txn;
-        Tuple posTuple = termTuple.add(position);
-
-        if(withPositions) {
-            txn.set(posTuple.pack(), Tuple.from().pack());
-            if(withPayloads) {
-                txn.set(posTuple.add(PAYLOAD).pack(), FDBDirectory.copyRange(payload));
-            }
-        }
-
-        if(withOffsets) {
-            txn.set(posTuple.add(START_OFFSET).pack(), Tuple.from(startOffset).pack());
-            txn.set(posTuple.add(END_OFFSET).pack(), Tuple.from(endOffset).pack());
-        }
+        Tuple valueTuple = Tuple.from(
+                hasOffsets ? startOffset : null,
+                hasOffsets ? endOffset : null,
+                hasPayloads ? FDBDirectory.copyRange(payload) : null
+        );
+        txn.set(termTuple.add(position).pack(), valueTuple.pack());
     }
 
     @Override

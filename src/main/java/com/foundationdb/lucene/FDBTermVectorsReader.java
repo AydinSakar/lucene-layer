@@ -34,23 +34,22 @@ public class FDBTermVectorsReader extends TermVectorsReader
         this.segmentTuple = dir.subspace.add(si.name).add(VECTORS_EXTENSION);
     }
 
-    // used by clone
-    FDBTermVectorsReader(FDBDirectory dir, Tuple segmentTuple) {
+    private FDBTermVectorsReader(FDBDirectory dir, Tuple segmentTuple) {
         this.dir = dir;
         this.segmentTuple = segmentTuple;
     }
 
     private static class FieldBuilder
     {
-        int num;
+        int fieldNum;
         String name;
-        Boolean withPositions;
-        Boolean withOffsets;
-        Boolean withPayloads;
-        TermVectorTerms terms;
+        Boolean hasPositions;
+        Boolean hasOffsets;
+        Boolean hasPayloads;
+        FDBTermVectorTerms terms;
 
-        public FieldBuilder(int num) {
-            this.num = num;
+        public FieldBuilder(int fieldNum) {
+            this.fieldNum = fieldNum;
         }
     }
 
@@ -58,7 +57,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
     public Fields get(int doc) throws IOException {
         final Tuple docTuple = segmentTuple.add(doc);
 
-        SortedMap<String, TermVectorTerms> fields = new TreeMap<String, TermVectorTerms>();
+        SortedMap<String, FDBTermVectorTerms> fields = new TreeMap<String, FDBTermVectorTerms>();
 
         Transaction txn = dir.txn;
         Iterator<KeyValue> it = txn.getRange(docTuple.range()).iterator();
@@ -77,54 +76,50 @@ public class FDBTermVectorsReader extends TermVectorsReader
             Tuple valueTuple = Tuple.fromBytes(kv.getValue());
 
             int fieldNum = (int)keyTuple.getLong(docTuple.size());
-            String part = keyTuple.getString(docTuple.size() + 1);
 
-            if(builder == null) {
-                builder = new FieldBuilder(fieldNum);
-            } else if(fieldNum != builder.num) {
-                fields.put(builder.name, builder.terms);
+            if(builder == null || fieldNum != builder.fieldNum) {
+                if(builder != null) {
+                    fields.put(builder.name, builder.terms);
+                }
                 builder = new FieldBuilder(fieldNum);
             }
-            if(FIELD_NAME.equals(part)) {
+
+            if(keyTuple.size() == (docTuple.size() + 1)) {
+                // Field start
                 builder.name = valueTuple.getString(0);
-            } else if(FIELD_POSITIONS.equals(part)) {
-                builder.withPositions = valueTuple.getLong(0) == 1;
-            } else if(FIELD_OFFSETS.equals(part)) {
-                builder.withOffsets = valueTuple.getLong(0) == 1;
-            } else if(FIELD_PAYLOADS.equals(part)) {
-                builder.withPayloads = valueTuple.getLong(0) == 1;
-            } else if(TERM.equals(part)) {
+                builder.hasPositions = valueTuple.getLong(1) == 1;
+                builder.hasOffsets = valueTuple.getLong(2) == 1;
+                builder.hasPayloads = valueTuple.getLong(3) == 1;
+            } else if(keyTuple.size() == (docTuple.size() + 2)) {
+                // Term data
                 kv = loadTerms(it, docTuple.size(), builder, kv);
                 continue;
             } else {
-                throw new IllegalStateException("Unexpected data part: " + part);
+                throw new IllegalStateException("Unexpected tuple: " + FDBDirectory.tupleStr(keyTuple));
             }
             kv = null;
         }
 
         if(builder != null) {
             fields.put(builder.name, builder.terms);
-            builder = null;
         }
 
-        return new TermVectorFields(fields);
+        return new FDBTermVectorFields(fields);
     }
 
     private static KeyValue loadTerms(Iterator<KeyValue> it, int fieldNumIndex, FieldBuilder builder, KeyValue initKV) {
-        final int FIELD_PART_INDEX = fieldNumIndex + 1;
-        final int TERM_NUM_INDEX = fieldNumIndex + 2;
-        final int TERM_POS_INDEX = fieldNumIndex + 3;
-        final int TERM_POS_PART_INDEX = fieldNumIndex + 4;
+        final int TERM_NUM_INDEX = fieldNumIndex + 1;
+        final int TERM_POS_INDEX = fieldNumIndex + 2;
 
         final KeyValue outKV;
 
         int lastTermNum = -1;
         int posIndex = -1;
-        FDBTermVectorsPostings postings = null;
-        final SortedMap<BytesRef, FDBTermVectorsPostings> terms = new TreeMap<BytesRef, FDBTermVectorsPostings>();
+        FDBTermVectorPostings postings = null;
+        final SortedMap<BytesRef, FDBTermVectorPostings> terms = new TreeMap<BytesRef, FDBTermVectorPostings>();
 
         boolean first = true;
-        for(; ; ) {
+        for(;;) {
             final KeyValue kv;
             if(first) {
                 kv = initKV;
@@ -141,74 +136,51 @@ public class FDBTermVectorsReader extends TermVectorsReader
             Tuple valueTuple = Tuple.fromBytes(kv.getValue());
 
             int fieldNum = (int)keyTuple.getLong(fieldNumIndex);
-            if(fieldNum != builder.num) {
+            if(fieldNum != builder.fieldNum) {
                 outKV = kv;
                 break;
             }
 
-            assert TERM.equals(keyTuple.getString(FIELD_PART_INDEX));
-
             int termNum = (int)keyTuple.getLong(TERM_NUM_INDEX);
-
             if(termNum != lastTermNum) {
-                assert (lastTermNum == -1) == (postings == null);
-
                 // Should always see metadata key first
+                assert (lastTermNum == -1) == (postings == null);
                 assert keyTuple.size() == (TERM_NUM_INDEX + 1);
+
                 lastTermNum = termNum;
                 posIndex = -1;
 
                 BytesRef term = new BytesRef(valueTuple.getBytes(0));
-                postings = new FDBTermVectorsPostings();
-                postings.freq = (int)valueTuple.getLong(1);
+                int freq = (int)valueTuple.getLong(1);
+                postings = new FDBTermVectorPostings(freq, builder.hasPositions, builder.hasPayloads, builder.hasOffsets);
                 terms.put(term, postings);
+            } else if(keyTuple.size() == (TERM_POS_INDEX + 1)) {
+                // Position data
+                assert builder.hasPositions || builder.hasOffsets || builder.hasPayloads;
 
-                if(builder.withPositions) {
-                    postings.positions = new int[postings.freq];
-                    if(builder.withPayloads) {
-                        postings.payloads = new BytesRef[postings.freq];
-                    }
+                ++posIndex;
+                if(builder.hasPositions) {
+                    postings.positions[posIndex] = (int)keyTuple.getLong(TERM_POS_INDEX);
                 }
-
-                if(builder.withOffsets) {
-                    postings.startOffsets = new int[postings.freq];
-                    postings.endOffsets = new int[postings.freq];
+                if(builder.hasOffsets) {
+                    postings.startOffsets[posIndex] = (int)valueTuple.getLong(0);
+                    postings.endOffsets[posIndex] = (int)valueTuple.getLong(1);
+                }
+                if(builder.hasPayloads) {
+                    postings.payloads[posIndex] = new BytesRef(valueTuple.getBytes(2));
                 }
             } else {
-                // Position data
-                assert builder.withPositions || builder.withOffsets;
-
-                int posNum = (int)keyTuple.getLong(TERM_POS_INDEX);
-                if(keyTuple.size() == TERM_POS_INDEX + 1) {
-                    ++posIndex;
-                    postings.positions[posIndex] = posNum;
-                } else if(keyTuple.size() == TERM_POS_PART_INDEX + 1) {
-                    String part = keyTuple.getString(TERM_POS_PART_INDEX);
-                    if(PAYLOAD.equals(part)) {
-                        assert builder.withPayloads;
-                        postings.payloads[posIndex] = valueTuple.size() == 0 ? null : new BytesRef(valueTuple.getBytes(0));
-                    } else if(START_OFFSET.equals(part)) {
-                        assert builder.withOffsets;
-                        postings.startOffsets[posIndex] = (int)valueTuple.getLong(0);
-                    } else if(END_OFFSET.equals(part)) {
-                        assert builder.withOffsets;
-                        postings.endOffsets[posIndex] = (int)valueTuple.getLong(0);
-                    } else {
-                        throw new IllegalStateException("Unexpected position info: " + part);
-                    }
-                } else {
-                    throw new IllegalStateException("Unexpected keyTuple size: " + keyTuple.size());
-                }
+                throw new IllegalStateException("Unexpected keyTuple size: " + keyTuple.size());
             }
         }
 
-        builder.terms = new TermVectorTerms(builder.withOffsets, builder.withPositions, builder.withPayloads, terms);
+        builder.terms = new FDBTermVectorTerms(builder.hasOffsets, builder.hasPositions, builder.hasPayloads, terms);
         return outKV;
     }
 
 
-    @SuppressWarnings("CloneDoesntCallSuperClone")
-    @Override
+
+    @Override @SuppressWarnings("CloneDoesntCallSuperClone")
     public TermVectorsReader clone() {
         // TODO: needed?
         //if(in == null) {
@@ -222,11 +194,11 @@ public class FDBTermVectorsReader extends TermVectorsReader
         // None
     }
 
-    private class TermVectorFields extends Fields
+    private class FDBTermVectorFields extends Fields
     {
-        private final SortedMap<String, TermVectorTerms> fields;
+        private final SortedMap<String, FDBTermVectorTerms> fields;
 
-        TermVectorFields(SortedMap<String, TermVectorTerms> fields) {
+        FDBTermVectorFields(SortedMap<String, FDBTermVectorTerms> fields) {
             this.fields = fields;
         }
 
@@ -246,40 +218,48 @@ public class FDBTermVectorsReader extends TermVectorsReader
         }
     }
 
-    private static class TermVectorTerms extends FDBTermsBase
+    private static class FDBTermVectorTerms extends FDBTermsBase
     {
-        final SortedMap<BytesRef, FDBTermVectorsPostings> terms;
+        final SortedMap<BytesRef, FDBTermVectorPostings> terms;
 
-        public TermVectorTerms(boolean hasOffsets,
-                               boolean hasPositions,
-                               boolean hasPayloads,
-                               SortedMap<BytesRef, FDBTermVectorsPostings> terms) {
+        public FDBTermVectorTerms(boolean hasOffsets,
+                                  boolean hasPositions,
+                                  boolean hasPayloads,
+                                  SortedMap<BytesRef, FDBTermVectorPostings> terms) {
             super(hasOffsets, hasPositions, hasPayloads, terms.size(), -1, 1);
             this.terms = terms;
         }
 
         @Override
         public TermsEnum iterator(TermsEnum reuse) throws IOException {
-            return new FDBTermVectorsTermsEnum(terms);
+            return new FDBTermVectorTermsEnum(terms);
         }
     }
 
-    private static class FDBTermVectorsPostings
+    private static class FDBTermVectorPostings
     {
-        private int freq;
-        private int positions[];
-        private int startOffsets[];
-        private int endOffsets[];
-        private BytesRef payloads[];
+        public final int freq;
+        public final int[] positions;
+        public final int[] startOffsets;
+        public final int[] endOffsets;
+        public final BytesRef[] payloads;
+
+        public FDBTermVectorPostings(int freq, boolean withPositions, boolean withPayload, boolean withOffsets) {
+            this.freq = freq;
+            this.positions = withPositions ? new int[freq] : null;
+            this.payloads = withPayload ? new BytesRef[freq] : null;
+            this.startOffsets = withOffsets ? new int[freq] : null;
+            this.endOffsets = withOffsets ? new int[freq] : null;
+        }
     }
 
-    private static class FDBTermVectorsTermsEnum extends TermsEnum
+    private static class FDBTermVectorTermsEnum extends TermsEnum
     {
-        private final SortedMap<BytesRef, FDBTermVectorsPostings> terms;
-        private Iterator<Map.Entry<BytesRef, FDBTermVectorsPostings>> iterator;
-        private Map.Entry<BytesRef, FDBTermVectorsPostings> current;
+        private final SortedMap<BytesRef, FDBTermVectorPostings> terms;
+        private Iterator<Map.Entry<BytesRef, FDBTermVectorPostings>> iterator;
+        private Map.Entry<BytesRef, FDBTermVectorPostings> current;
 
-        FDBTermVectorsTermsEnum(SortedMap<BytesRef, FDBTermVectorsPostings> terms) {
+        FDBTermVectorTermsEnum(SortedMap<BytesRef, FDBTermVectorPostings> terms) {
             this.terms = terms;
             this.iterator = terms.entrySet().iterator();
         }
@@ -289,9 +269,8 @@ public class FDBTermVectorsReader extends TermVectorsReader
             iterator = terms.tailMap(text).entrySet().iterator();
             if(!iterator.hasNext()) {
                 return SeekStatus.END;
-            } else {
-                return next().equals(text) ? SeekStatus.FOUND : SeekStatus.NOT_FOUND;
             }
+            return next().equals(text) ? SeekStatus.FOUND : SeekStatus.NOT_FOUND;
         }
 
         @Override
@@ -303,10 +282,9 @@ public class FDBTermVectorsReader extends TermVectorsReader
         public BytesRef next() throws IOException {
             if(!iterator.hasNext()) {
                 return null;
-            } else {
-                current = iterator.next();
-                return current.getKey();
             }
+            current = iterator.next();
+            return current.getKey();
         }
 
         @Override
@@ -333,19 +311,19 @@ public class FDBTermVectorsReader extends TermVectorsReader
         public DocsEnum docs(Bits liveDocs, DocsEnum reuse, int flags) {
             // TODO: reuse?
             int freq = (flags & DocsEnum.FLAG_FREQS) == 0 ? 1 : current.getValue().freq;
-            FDBTermVectorsDocsAndPositionsEnum e = new FDBTermVectorsDocsAndPositionsEnum();
+            FDBTermVectorDocsAndPositionsEnum e = new FDBTermVectorDocsAndPositionsEnum();
             e.reset(freq, liveDocs, null, null, null, null);
             return e;
         }
 
         @Override
         public DocsAndPositionsEnum docsAndPositions(Bits liveDocs, DocsAndPositionsEnum reuse, int flags) {
-            FDBTermVectorsPostings postings = current.getValue();
+            FDBTermVectorPostings postings = current.getValue();
             if(postings.positions == null && postings.startOffsets == null) {
                 return null;
             }
             // TODO: reuse?
-            FDBTermVectorsDocsAndPositionsEnum e = new FDBTermVectorsDocsAndPositionsEnum();
+            FDBTermVectorDocsAndPositionsEnum e = new FDBTermVectorDocsAndPositionsEnum();
             e.reset(null, liveDocs, postings.positions, postings.startOffsets, postings.endOffsets, postings.payloads);
             return e;
         }
@@ -356,7 +334,7 @@ public class FDBTermVectorsReader extends TermVectorsReader
         }
     }
 
-    private static class FDBTermVectorsDocsAndPositionsEnum extends DocsAndPositionsEnum
+    private static class FDBTermVectorDocsAndPositionsEnum extends DocsAndPositionsEnum
     {
         private Integer freq;
         private boolean didNext;
@@ -376,7 +354,6 @@ public class FDBTermVectorsReader extends TermVectorsReader
             if(positions != null) {
                 return positions.length;
             }
-            assert startOffsets != null;
             return startOffsets.length;
         }
 
@@ -389,10 +366,11 @@ public class FDBTermVectorsReader extends TermVectorsReader
         public int nextDoc() {
             if(!didNext && (liveDocs == null || liveDocs.get(0))) {
                 didNext = true;
-                return (doc = 0);
+                doc = 0;
             } else {
-                return (doc = NO_MORE_DOCS);
+                doc = NO_MORE_DOCS;
             }
+            return doc;
         }
 
         @Override
@@ -427,28 +405,19 @@ public class FDBTermVectorsReader extends TermVectorsReader
             assert (positions != null && nextPos < positions.length) || startOffsets != null && nextPos < startOffsets.length;
             if(positions != null) {
                 return positions[nextPos++];
-            } else {
-                nextPos++;
-                return -1;
             }
+            nextPos++;
+            return -1;
         }
 
         @Override
         public int startOffset() {
-            if(startOffsets == null) {
-                return -1;
-            } else {
-                return startOffsets[nextPos - 1];
-            }
+            return (startOffsets == null) ? -1 : startOffsets[nextPos - 1];
         }
 
         @Override
         public int endOffset() {
-            if(endOffsets == null) {
-                return -1;
-            } else {
-                return endOffsets[nextPos - 1];
-            }
+            return (endOffsets == null) ? -1 : endOffsets[nextPos - 1];
         }
 
         @Override
