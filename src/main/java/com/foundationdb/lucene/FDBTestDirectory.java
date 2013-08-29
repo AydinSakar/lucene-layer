@@ -39,7 +39,7 @@ public class FDBTestDirectory extends FDBDirectory
   private static Database fdbDB;
 
   public FDBTestDirectory() {
-    super(String.format("%d", RND.nextInt()), newTransactionForTest());
+    super(String.format("dir_%d", RND.nextInt(100000)), newTransactionForTest());
   }
 
 
