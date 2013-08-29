@@ -333,11 +333,11 @@ public final class FDBPostingsFormat extends PostingsFormat
                     continue;
                 }
                 int curDocID = (int)curTuple.getLong(termTuple.size());
-                if(liveDocs == null || liveDocs.get(docID)) {
+                if(liveDocs == null || liveDocs.get(curDocID)) {
                     docID = curDocID;
                     termFreq = (int)Tuple.fromBytes(kv.getValue()).getLong(0);
+                    return docID;
                 }
-                return docID;
             }
 
             docID = NO_MORE_DOCS;
