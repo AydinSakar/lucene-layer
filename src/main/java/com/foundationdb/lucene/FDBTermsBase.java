@@ -14,8 +14,8 @@ public abstract class FDBTermsBase extends Terms
     private final long sumDocFreq;
     private final int docCount;
 
-    public FDBTermsBase(boolean hasOffsets,
-                        boolean hasPositions,
+    public FDBTermsBase(boolean hasPositions,
+                        boolean hasOffsets,
                         boolean hasPayloads,
                         long size,
                         long sumDocFeq,

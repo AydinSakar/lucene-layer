@@ -14,6 +14,8 @@ import java.util.Comparator;
 public class FDBTermVectorsWriter extends TermVectorsWriter
 {
     static final String VECTORS_EXTENSION = "vec";
+    static final String FIELDS = "fields";
+    static final String TERMS = "terms";
 
     private final FDBDirectory dir;
     private final Tuple segmentTuple;
@@ -21,8 +23,8 @@ public class FDBTermVectorsWriter extends TermVectorsWriter
     private int numTermsWritten;
 
     private Tuple docTuple;
-    private Tuple fieldTuple;
     private Tuple termTuple;
+    private FieldInfo curField;
 
     private boolean hasPositions;
     private boolean hasOffsets;
@@ -42,21 +44,21 @@ public class FDBTermVectorsWriter extends TermVectorsWriter
 
 
     //
-    // (segmentName, "vec", docNum, fieldNum) => (name, hasPositions, hasOffsets, hasPayloads)
-    // (segmentName, "vec", docNum, fieldNum, term0) => (termBytes, freq)
-    // (segmentName, "vec", docNum, fieldNum, term0, posNum0) => (start_offset, end_offset, payload)
-    // (segmentName, "vec", docNum, fieldNum, term0, posNum1) => (start_offset, end_offset, payload)
-    // (segmentName, "vec", docNum, fieldNum, term1) => (termBytes, freq)
+    // (segmentName, "vec", docNum, "fields", fieldName0) => (fieldNum, numTerms, hasPositions, hasOffsets, hasPayloads)
+    // (segmentName, "vec", docNum, "fields", fieldName1) => (fieldNum, numTerms, hasPositions, hasOffsets, hasPayloads)
+    // ...
+    // (segmentName, "vec", docNum, "terms", fieldName, termBytes0) => (freq)
+    // (segmentName, "vec", docNum, "terms", fieldName, termBytes0, posNum0) => (start_offset, end_offset, payload)
+    // (segmentName, "vec", docNum, "terms", fieldName, termBytes0, posNum1) => (start_offset, end_offset, payload)
+    // (segmentName, "vec", docNum, "terms", fieldName, termBytes1) => (freq)
     // ...
     //
 
     @Override
     public void startField(FieldInfo info, int numTerms, boolean positions, boolean offsets, boolean payloads) {
-        fieldTuple = docTuple.add(info.number);
-        Transaction txn = dir.txn;
-
-        txn.set(fieldTuple.pack(), Tuple.from(info.name, positions ? 1 : 0, offsets ? 1 : 0, payloads ? 1 : 0).pack());
-
+        curField = info;
+        dir.txn.set(docTuple.add(FIELDS).add(curField.name).pack(),
+                    Tuple.from(info.number, numTerms, positions ? 1 : 0, offsets ? 1 : 0, payloads ? 1 : 0).pack());
         hasPositions = positions;
         hasOffsets = offsets;
         hasPayloads = payloads;
@@ -65,8 +67,8 @@ public class FDBTermVectorsWriter extends TermVectorsWriter
 
     @Override
     public void startTerm(BytesRef term, int freq) throws IOException {
-        termTuple = fieldTuple.add(numTermsWritten);
-        dir.txn.set(termTuple.pack(), Tuple.from(FDBDirectory.copyRange(term), freq).pack());
+        termTuple = docTuple.add(TERMS).add(curField.name).add(FDBDirectory.copyRange(term));
+        dir.txn.set(termTuple.pack(), Tuple.from(freq).pack());
         ++numTermsWritten;
     }
 

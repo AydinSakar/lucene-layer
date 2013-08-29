@@ -153,8 +153,8 @@ public final class FDBPostingsFormat extends PostingsFormat
 
         public FDBPostingsTerms(Transaction txn, FieldInfo fieldInfo, Tuple segmentTuple) {
             super(
-                    fieldInfo.getIndexOptions().compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0,
                     fieldInfo.getIndexOptions().compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS) >= 0,
+                    fieldInfo.getIndexOptions().compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0,
                     fieldInfo.hasPayloads(),
                     -1,
                     -1,

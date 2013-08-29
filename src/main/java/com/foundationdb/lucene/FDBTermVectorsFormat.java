@@ -13,7 +13,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
 
     @Override
     public TermVectorsReader vectorsReader(Directory directory, SegmentInfo si, FieldInfos fi, IOContext context) {
-        return new FDBTermVectorsReader(directory, si);
+        return new FDBTermVectorsReader(directory, si, fi);
     }
 
     @Override
