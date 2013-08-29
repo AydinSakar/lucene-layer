@@ -20,9 +20,19 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+
+//
+// (dirTuple, segmentName, "fld", docID, 0, fieldNum) => (type, dataIndex)          # "field type" key
+// ...
+// (dirTuple, segmentName, "fld", docID, 1, fieldNum, dataIndex, off0) => (data2)   # "field data" key, part 1
+// (dirTuple, segmentName, "fld", docID, 1, fieldNum, dataIndex, off1) => (data2)   # "field data" key, part 2
+// ..
+//
 public class FDBStoredFieldsFormat extends StoredFieldsFormat
 {
     private final static String STORED_FIELDS_EXTENSION = "fld";
+    private final static int FIELD_TYPE_SPACE = 0;
+    private final static int FIELD_DATA_SPACE = 1;
     private final static String TYPE_STRING = "string";
     private final static String TYPE_BINARY = "binary";
     private final static String TYPE_INT = "int";
@@ -79,15 +89,17 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
 
 
         @Override
-        public void visitDocument(int n, StoredFieldVisitor visitor) throws IOException {
-            final Tuple docTuple = segmentTuple.add(n);
-            final Tuple docTypeTuple = makeFieldTypeTuple(docTuple, n);
+        public void visitDocument(int docID, StoredFieldVisitor visitor) throws IOException {
+            final Tuple docTuple = segmentTuple.add(docID);
+            final Tuple docTypesTuple = segmentTuple.add(docID).add(FIELD_TYPE_SPACE);
 
-            for(KeyValue kv : dir.txn.getRange(docTypeTuple.range())) {
-                int fieldNumber = (int)Tuple.fromBytes(kv.getKey()).getLong(docTypeTuple.size());
-                Tuple typeTuple = Tuple.fromBytes(kv.getValue());
-                String type = typeTuple.getString(0);
-                long index = typeTuple.getLong(1);
+            for(KeyValue kv : dir.txn.getRange(docTypesTuple.range())) {
+                Tuple keyTuple = Tuple.fromBytes(kv.getKey());
+                Tuple valueTuple = Tuple.fromBytes(kv.getValue());
+
+                int fieldNumber = (int)keyTuple.getLong(docTypesTuple.size());
+                String type = valueTuple.getString(0);
+                long dataIndex = valueTuple.getLong(1);
 
                 FieldInfo fieldInfo = fieldInfos.fieldInfo(fieldNumber);
                 if(!KNOWN_TYPES.contains(type)) {
@@ -96,7 +108,7 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
 
                 switch(visitor.needsField(fieldInfo)) {
                     case YES:
-                        readField(makeFieldDataTuple(docTuple, n, index), type, fieldInfo, visitor);
+                        readField(makeFieldDataTuple(docTuple, fieldNumber, dataIndex), type, fieldInfo, visitor);
                         break;
                     case NO:
                         break;
@@ -251,10 +263,10 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
     //
 
     private static Tuple makeFieldTypeTuple(Tuple docTuple, int fieldNum) {
-        return docTuple.add(0).add(fieldNum);
+        return docTuple.add(FIELD_TYPE_SPACE).add(fieldNum);
     }
 
     private static Tuple makeFieldDataTuple(Tuple docTuple, int fieldNum, long index) {
-        return docTuple.add(1).add(fieldNum).add(index);
+        return docTuple.add(FIELD_DATA_SPACE).add(fieldNum).add(index);
     }
 }
