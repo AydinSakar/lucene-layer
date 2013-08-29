@@ -37,7 +37,7 @@ import static com.foundationdb.lucene.FDBDirectory.unpackLongForAtomic;
 public final class FDBPostingsFormat extends PostingsFormat
 {
     private static final String POSTINGS_EXTENSION = "pst";
-    private static final byte[] ATOMIC_OP_LONG_0 = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    private static final String NUM_DOCS = "numDocs";
     private static final byte[] ATOMIC_OP_LONG_1 = { 1, 0, 0, 0, 0, 0, 0, 0 };
 
 
@@ -183,7 +183,7 @@ public final class FDBPostingsFormat extends PostingsFormat
         private final IndexOptions indexOptions;
         private final Tuple fieldTuple;
         private BytesRef foundTerm = null;
-        private int docFreq;
+        private int docFreq = -1;
 
         public FDBTermsEnum(Transaction txn, Tuple fieldTuple, IndexOptions indexOptions) {
             this.txn = txn;
@@ -209,7 +209,7 @@ public final class FDBPostingsFormat extends PostingsFormat
             byte[] term = t.getBytes(fieldTuple.size());
             foundTerm = new BytesRef(term);
 
-            // NOTE: "numDocs" delicate
+            // Note: Delicate, NUM_DOCS key sorts first
             docFreq = (int)unpackLongForAtomic(range.get(0).getValue());
 
             if(foundTerm.equals(text)) {
@@ -428,6 +428,7 @@ public final class FDBPostingsFormat extends PostingsFormat
         private final boolean writeOffsets;
         private Tuple termTuple = null;
         private Tuple docTuple = null;
+        private boolean wroteNumDocs;
 
 
         public FDBPostingsConsumer(Transaction txn, FieldInfo field) {
@@ -440,14 +441,21 @@ public final class FDBPostingsFormat extends PostingsFormat
 
         public FDBPostingsConsumer startTerm(BytesRef term, Tuple fieldTuple) {
             this.termTuple = fieldTuple.add(Arrays.copyOfRange(term.bytes, term.offset, term.offset + term.length));
-            txn.set(termTuple.add("numDocs").pack(), ATOMIC_OP_LONG_0);
+            // Deferred, as term might have zero docs
+            wroteNumDocs = false;
             return this;
         }
 
         @Override
         public void startDoc(int docID, int termDocFreq) {
+            if(!wroteNumDocs) {
+                txn.set(termTuple.add(NUM_DOCS).pack(), ATOMIC_OP_LONG_1);
+                wroteNumDocs = true;
+            } else {
+                txn.mutate(MutationType.ADD, termTuple.add(NUM_DOCS).pack(), ATOMIC_OP_LONG_1);
+            }
             docTuple = termTuple.add(docID);
-            txn.mutate(MutationType.ADD, termTuple.add("numDocs").pack(), ATOMIC_OP_LONG_1);
+
             txn.set(docTuple.pack(), Tuple.from(termDocFreq).pack());
             // if(indexOptions != IndexOptions.DOCS_ONLY) {
         }
