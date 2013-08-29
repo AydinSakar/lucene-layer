@@ -22,7 +22,7 @@ public class FDBNormsFormat extends NormsFormat
         return new FDBNormsProducer(state);
     }
 
-    public static class FDBNormsProducer extends FDBDocValuesReader
+    public static class FDBNormsProducer extends FDBDocValuesProducer
     {
         public FDBNormsProducer(SegmentReadState state) throws IOException {
             // All we do is change the extension from .dat -> .len;
@@ -31,7 +31,7 @@ public class FDBNormsFormat extends NormsFormat
         }
     }
 
-    public static class FDBNormsConsumer extends FDBDocValuesWriter
+    public static class FDBNormsConsumer extends FDBDocValuesConsumer
     {
         public FDBNormsConsumer(SegmentWriteState state) throws IOException {
             // All we do is change the extension from .dat -> .len;

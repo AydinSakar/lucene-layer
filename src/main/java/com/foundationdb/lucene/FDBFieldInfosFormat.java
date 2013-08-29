@@ -112,7 +112,10 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
                     throw new IllegalStateException("Unknown key: " + key);
                 }
             }
-            fieldInfos.add(info.build(lastFieldNum));
+
+            if(info != null) {
+                fieldInfos.add(info.build(lastFieldNum));
+            }
 
             return new FieldInfos(fieldInfos.toArray(new FieldInfo[fieldInfos.size()]));
         }

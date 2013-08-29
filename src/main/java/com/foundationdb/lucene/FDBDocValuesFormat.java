@@ -21,11 +21,11 @@ public class FDBDocValuesFormat extends DocValuesFormat
 
     @Override
     public DocValuesConsumer fieldsConsumer(SegmentWriteState state) throws IOException {
-        return new FDBDocValuesWriter(state, "dat");
+        return new FDBDocValuesConsumer(state, "dat");
     }
 
     @Override
     public DocValuesProducer fieldsProducer(SegmentReadState state) throws IOException {
-        return new FDBDocValuesReader(state, "dat");
+        return new FDBDocValuesProducer(state, "dat");
     }
 }
