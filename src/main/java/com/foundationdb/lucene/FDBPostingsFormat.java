@@ -22,7 +22,6 @@ import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -34,6 +33,12 @@ import java.util.TreeSet;
 import static com.foundationdb.lucene.FDBDirectory.copyRange;
 import static com.foundationdb.lucene.FDBDirectory.unpackLongForAtomic;
 
+
+//
+// (dirTuple, segmentName, "pst", fieldNum, termBytes, "numDocs") => (atomic_op_num)
+// (dirTuple, segmentName, "pst", fieldNum, termBytes, docID0) => ([termDocFreq])
+// (dirTuple, segmentName, "pst", fieldNum, termBytes, docID0, posNum) => ([startOffset, endOffset, payload])
+//
 public final class FDBPostingsFormat extends PostingsFormat
 {
     private static final String POSTINGS_EXTENSION = "pst";
@@ -62,7 +67,7 @@ public final class FDBPostingsFormat extends PostingsFormat
 
 
     //
-    // FieldsProducer (reading)
+    // FieldsProducer (Reader)
     //
 
     private static class FDBFieldsProducer extends FieldsProducer
@@ -117,7 +122,7 @@ public final class FDBPostingsFormat extends PostingsFormat
 
 
     //
-    // FieldsConsumer (writing)
+    // FieldsConsumer (Writer)
     //
 
     private static class FDBFieldsConsumer extends FieldsConsumer
@@ -281,15 +286,17 @@ public final class FDBPostingsFormat extends PostingsFormat
 
     private static class FDBDocsAndPositionsEnum extends DocsAndPositionsEnum
     {
-        private Tuple termTuple;
-        private Bits liveDocs;
-        private int docFreq;
-        private int termFreq;
-        private int docID;
+        private final Tuple termTuple;
+        private final boolean readOffsets;
+        private final boolean readPositions;
+        private final Bits liveDocs;
+        private final int docFreq;
         private Iterator<KeyValue> termIterator;
-
-        private boolean readOffsets;
-        private boolean readPositions;
+        private int docID;
+        private int termDocFreq;
+        private int startOffset;
+        private int endOffset;
+        private BytesRef payload;
 
 
         public FDBDocsAndPositionsEnum(Transaction txn,
@@ -298,13 +305,16 @@ public final class FDBPostingsFormat extends PostingsFormat
                                        IndexOptions options,
                                        int docFreq) {
             this.termTuple = termTuple;
-            this.liveDocs = liveDocs;
-            this.docFreq = docFreq;
-            this.docID = -1;
-            this.termIterator = txn.getRange(termTuple.add(0).pack(), termTuple.range().end).iterator();
-
             this.readPositions = options.compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS) >= 0;
             this.readOffsets = options.compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
+            this.liveDocs = liveDocs;
+            this.docFreq = docFreq;
+
+            this.termIterator = txn.getRange(termTuple.add(0).pack(), termTuple.range().end).iterator();
+            this.docID = -1;
+            if(!readOffsets) {
+                startOffset = endOffset = -1;
+            }
         }
 
 
@@ -315,16 +325,16 @@ public final class FDBPostingsFormat extends PostingsFormat
 
         @Override
         public int freq() {
-            return termFreq;
+            return termDocFreq;
         }
 
         @Override
         public int nextDoc() {
-            // Exhausted
             if(docID == NO_MORE_DOCS) {
                 return docID;
             }
 
+            docID = NO_MORE_DOCS;
             while(termIterator.hasNext()) {
                 KeyValue kv = termIterator.next();
                 Tuple curTuple = Tuple.fromBytes(kv.getKey());
@@ -335,49 +345,63 @@ public final class FDBPostingsFormat extends PostingsFormat
                 int curDocID = (int)curTuple.getLong(termTuple.size());
                 if(liveDocs == null || liveDocs.get(curDocID)) {
                     docID = curDocID;
-                    termFreq = (int)Tuple.fromBytes(kv.getValue()).getLong(0);
-                    return docID;
+                    Tuple valueTuple = Tuple.fromBytes(kv.getValue());
+                    termDocFreq = (valueTuple.size() > 0) ? (int)valueTuple.getLong(0) : -1;
+                    break;
                 }
             }
-
-            docID = NO_MORE_DOCS;
             return docID;
         }
 
         @Override
         public int advance(int docIDTarget) throws IOException {
-            // Naive -- better to index skip data
             return slowAdvance(docIDTarget);
         }
 
         @Override
         public int nextPosition() {
             if(!readPositions) {
+                // We always have positions if offsets or payload was present. Could we return it then?
                 return -1;
             }
 
+            // nextDoc has been called so termIterator should be pointing to the first position
             assert termIterator.hasNext();
-            KeyValue kv = termIterator.next();
-            Tuple curTuple = Tuple.fromBytes(kv.getKey());
-            assert curTuple.size() == (termTuple.size() + 2);
-            return (int)curTuple.getLong(termTuple.size() + 1);
 
-            // TODO: offsets, payloads
+            KeyValue kv = termIterator.next();
+            Tuple keyTuple = Tuple.fromBytes(kv.getKey());
+            Tuple valueTuple = Tuple.fromBytes(kv.getValue());
+
+            int position = (int)keyTuple.getLong(keyTuple.size() - 1);
+
+            if(readOffsets) {
+                startOffset = (int)valueTuple.getLong(0);
+                endOffset = (int)valueTuple.getLong(1);
+            }
+
+            byte[] payloadBytes = valueTuple.getBytes(2);
+            if(payloadBytes != null) {
+                payload = new BytesRef(payloadBytes);
+            } else {
+                payload = null;
+            }
+
+            return position;
         }
 
         @Override
         public int startOffset() {
-            return -1;
+            return startOffset;
         }
 
         @Override
         public int endOffset() {
-            return -1;
+            return endOffset;
         }
 
         @Override
         public BytesRef getPayload() {
-            return null;
+            return payload;
         }
 
         @Override
@@ -440,7 +464,7 @@ public final class FDBPostingsFormat extends PostingsFormat
         }
 
         public FDBPostingsConsumer startTerm(BytesRef term, Tuple fieldTuple) {
-            this.termTuple = fieldTuple.add(Arrays.copyOfRange(term.bytes, term.offset, term.offset + term.length));
+            this.termTuple = fieldTuple.add(FDBDirectory.copyRange(term));
             // Deferred, as term might have zero docs
             wroteNumDocs = false;
             return this;
@@ -456,34 +480,21 @@ public final class FDBPostingsFormat extends PostingsFormat
             }
             docTuple = termTuple.add(docID);
 
-            txn.set(docTuple.pack(), Tuple.from(termDocFreq).pack());
-            // if(indexOptions != IndexOptions.DOCS_ONLY) {
+            Tuple valueTuple = new Tuple();
+            if(indexOptions != IndexOptions.DOCS_ONLY) {
+                valueTuple = valueTuple.add(termDocFreq);
+            }
+
+            txn.set(docTuple.pack(), valueTuple.pack());
         }
 
         @Override
         public void addPosition(int position, BytesRef payload, int startOffset, int endOffset) {
-            if(writePositions) {
-                txn.set(docTuple.add(position).pack(), new byte[0]);
+            // If there is anything to write, just write it all (positions and offsets are tiny)
+            if(writePositions || writeOffsets || (payload != null && payload.length > 0)) {
+                Tuple valueTuple = Tuple.from(startOffset, endOffset, FDBDirectory.copyRange(payload));
+                txn.set(docTuple.add(position).pack(), valueTuple.pack());
             }
-            assert payload == null;
-                /*
-                if(writeOffsets) {
-                    lastStartOffset = startOffset;
-                    write(START_OFFSET);
-                    write(Integer.toString(startOffset));
-                    newline();
-                    write(END_OFFSET);
-                    write(Integer.toString(endOffset));
-                    newline();
-                }
-
-                if(payload != null && payload.length > 0) {
-                    assert payload.length != 0;
-                    write(PAYLOAD);
-                    write(payload);
-                    newline();
-                }
-                */
         }
 
         @Override

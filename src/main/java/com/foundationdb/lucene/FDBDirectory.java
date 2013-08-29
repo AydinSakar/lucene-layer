@@ -71,6 +71,9 @@ public class FDBDirectory extends Directory
     }
 
     static byte[] copyRange(BytesRef ref) {
+        if(ref == null) {
+            return null;
+        }
         return Arrays.copyOfRange(ref.bytes, ref.offset, ref.offset + ref.length);
     }
 
