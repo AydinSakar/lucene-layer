@@ -1,7 +1,6 @@
 package com.foundationdb.lucene;
 
 import com.foundationdb.KeyValue;
-import com.foundationdb.async.AsyncIterator;
 import com.foundationdb.tuple.Tuple;
 import org.apache.lucene.codecs.DocValuesProducer;
 import org.apache.lucene.index.BinaryDocValues;
@@ -14,6 +13,7 @@ import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.util.BytesRef;
 
 import java.util.Iterator;
+import java.util.List;
 
 import static com.foundationdb.lucene.FDBDocValuesConsumer.*;
 
@@ -25,38 +25,35 @@ class FDBDocValuesProducer extends DocValuesProducer
     private final FDBDirectory dir;
     private final Tuple segmentTuple;
 
-    //final int maxDoc;
-    //final Map<String, OneField> fields = new HashMap<String, OneField>();
 
     public FDBDocValuesProducer(SegmentReadState state, String ext) {
-        //System.out.println("new producer"); System.out.flush();
+        //System.out.println("Producer: " + state.segmentInfo.name +", " + state.segmentSuffix + ", " + ext); System.out.flush();
         this.dir = FDBDirectory.unwrapFDBDirectory(state.directory);
         this.segmentTuple = dir.subspace.add(state.segmentInfo.name).add(state.segmentSuffix).add(ext);
     }
 
 
+    //
+    // DocValuesProducer
+    //
+
     @Override
     public NumericDocValues getNumeric(FieldInfo fieldInfo) {
-        //System.out.println("  getNumeric: " + fieldInfo.name); System.out.flush();
         return new FDBNumericDocValues(fieldInfo.name);
     }
 
-
     @Override
     public BinaryDocValues getBinary(FieldInfo fieldInfo) {
-        //System.out.println("  getBinary: " + fieldInfo.name); System.out.flush();
         return new FDBBinaryDocValues(fieldInfo.name);
     }
 
     @Override
     public SortedDocValues getSorted(FieldInfo fieldInfo) {
-        //System.out.println("  getSorted: " + fieldInfo.name); System.out.flush();
         return new FDBSortedDocValues(fieldInfo.name);
     }
 
     @Override
     public SortedSetDocValues getSortedSet(FieldInfo fieldInfo) {
-        //System.out.println("  getSortedSet: " + fieldInfo.name); System.out.flush();
         return new FDBSortedSetDocValues(fieldInfo.name);
     }
 
@@ -135,17 +132,18 @@ class FDBDocValuesProducer extends DocValuesProducer
 
         @Override
         public int getValueCount() {
-            // Equivalent to 1 + maxOrdinal
-            int maxOrdinal = -1;
-            for(KeyValue kv : dir.txn.getRange(sortedTuple.add(ORD).range())) {
-                int curOrdinal = (int)Tuple.fromBytes(kv.getValue()).getLong(0);
-                if(curOrdinal > maxOrdinal) {
-                    maxOrdinal = curOrdinal;
+            int valueCount = 0;
+            Tuple bytesTuple = sortedTuple.add(BYTES);
+            List<KeyValue> lastValue = dir.txn.getRange(bytesTuple.range(), 1, true).asList().get();
+            if(!lastValue.isEmpty()) {
+                if(!lastValue.isEmpty()) {
+                    KeyValue kv = lastValue.get(0);
+                    int maxOrdinal = (int)Tuple.fromBytes(kv.getKey()).getLong(bytesTuple.size());
+                    valueCount = maxOrdinal + 1;
                 }
             }
-            maxOrdinal = maxOrdinal + 1;
-            //System.out.println("  getValueCount: " + maxOrdinal); System.out.flush();
-            return maxOrdinal;
+            //System.out.println("  getValueCount: " + valueCount); System.out.flush();
+            return valueCount;
         }
     }
 
@@ -174,8 +172,8 @@ class FDBDocValuesProducer extends DocValuesProducer
 
         @Override
         public void setDocument(int docID) {
-            //System.out.println("  startDoc: " + docID); System.out.flush();
-            ordIt = dir.txn.getRange(sortedSetTuple.add(DOC_TO_ORD).range()).iterator();
+            //System.out.println("  setDocument: " + docID); System.out.flush();
+            ordIt = dir.txn.getRange(sortedSetTuple.add(DOC_TO_ORD).add(docID).range()).iterator();
         }
 
         @Override
@@ -185,18 +183,21 @@ class FDBDocValuesProducer extends DocValuesProducer
             result.bytes = Tuple.fromBytes(bytes).getBytes(0);
             result.offset = 0;
             result.length = result.bytes.length;
-            //System.out.println("  lookupOrd: ord: " + ord + ", result: " + new String(result.bytes)); System.out.flush();
+            //System.out.println("  lookupOrd: ord: " + ord + ", result: " + new String(result.bytes, result.offset, result.length)); System.out.flush();
         }
 
         @Override
         public long getValueCount() {
             Tuple bytesTuple = sortedSetTuple.add(BYTES);
-            Iterator<KeyValue> it = dir.txn.getRange(bytesTuple.range(), 1, true).iterator();
-            assert it.hasNext() : "No byte values";
-            KeyValue kv = it.next();
-            int value = (int)Tuple.fromBytes(kv.getKey()).getLong(bytesTuple.size());
-            //System.out.println("  valueCount: " + value); System.out.flush();
-            return value + 1;
+            List<KeyValue> lastValue = dir.txn.getRange(bytesTuple.range(), 1, true).asList().get();
+            int valueCount = 0;
+            if(!lastValue.isEmpty()) {
+                KeyValue kv = lastValue.get(0);
+                int maxOrdinal = (int)Tuple.fromBytes(kv.getKey()).getLong(bytesTuple.size());
+                valueCount = maxOrdinal + 1;
+            }
+            //System.out.println("  getValueCount: " + valueCount); System.out.flush();
+            return valueCount;
         }
     }
 }

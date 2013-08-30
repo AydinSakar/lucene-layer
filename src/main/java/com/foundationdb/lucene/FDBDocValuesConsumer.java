@@ -15,14 +15,28 @@ import java.util.Set;
 //
 // Writer
 //
+// type=numeric:
+// (dirTuple, segName, segSuffix, ext, fieldName, NUMERIC, docID) => (value0)
+//
+// type=sorted:
+// (dirTuple, segName, segSuffix, ext, fieldName, SORTED, "bytes", ordNum) => (bytes)
+// ...
+// (dirTuple, segName, segSuffix, ext, fieldName, SORTED, "ord", docID) => (ordNum)
+// ...
+//
+// type=sortedSet:
+// (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "bytes", ordNum) => (bytes)
+// ...
+// (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "doc_ord", docID0, ordNum0) => []
+// (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "doc_ord", docID0, ordNum1) => []
+// (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "doc_ord", docID1, ordNum0) => []
+// ...
+//
 class FDBDocValuesConsumer extends DocValuesConsumer
 {
     static final String BYTES = "bytes";
     static final String ORD = "ord";
     static final String DOC_TO_ORD = "doc_ord";
-
-    // Asserts only
-    private final Set<String> fieldsSeen = new HashSet<String>();
 
     private final FDBDirectory dir;
     private final Tuple segmentTuple;
@@ -30,40 +44,19 @@ class FDBDocValuesConsumer extends DocValuesConsumer
 
 
     public FDBDocValuesConsumer(SegmentWriteState state, String ext) throws IOException {
-        //System.out.println("new consumer"); System.out.flush();
+        //System.out.println("Consumer: " + state.segmentInfo.name +", " + state.segmentSuffix + ", " + ext); System.out.flush();
         dir = FDBDirectory.unwrapFDBDirectory(state.directory);
         segmentTuple = dir.subspace.add(state.segmentInfo.name).add(state.segmentSuffix).add(ext);
         numDocs = state.segmentInfo.getDocCount();
     }
 
-    private boolean sawField(String field) {
-        assert !fieldsSeen.contains(field) : "field \"" + field + "\" was added more than once during flush";
-        fieldsSeen.add(field);
-        return true;
-    }
 
     //
-    // type=numeric:
-    // (dirTuple, segName, segSuffix, ext, fieldName, NUMERIC, docID) => (value0)
-    //
-    // type=sorted:
-    // (dirTuple, segName, segSuffix, ext, fieldName, SORTED, "bytes", ordNum) => (bytes)
-    // ...
-    // (dirTuple, segName, segSuffix, ext, fieldName, SORTED, "ord", docID) => (ordNum)
-    // ...
-    //
-    // type=sortedSet:
-    // (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "bytes", ordNum) => (bytes)
-    // ...
-    // (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "doc_ord", docID0, ordNum0) => []
-    // (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "doc_ord", docID0, ordNum1) => []
-    // (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "doc_ord", docID1, ordNum0) => []
-    // ...
+    // DocValuesConsumer
     //
 
     @Override
     public void addNumericField(FieldInfo field, Iterable<Number> values) {
-        assert sawField(field.name);
         assert (field.getDocValuesType() == DocValuesType.NUMERIC || field.getNormType() == DocValuesType.NUMERIC);
 
         Tuple fieldTuple = segmentTuple.add(field.name).add(DocValuesType.NUMERIC.ordinal());
@@ -81,7 +74,6 @@ class FDBDocValuesConsumer extends DocValuesConsumer
 
     @Override
     public void addBinaryField(FieldInfo field, Iterable<BytesRef> values) {
-        assert sawField(field.name);
         assert field.getDocValuesType() == DocValuesType.BINARY;
 
         Tuple fieldTuple = segmentTuple.add(field.name).add(DocValuesType.BINARY.ordinal());
@@ -100,7 +92,6 @@ class FDBDocValuesConsumer extends DocValuesConsumer
     public void addSortedField(FieldInfo field,
                                Iterable<BytesRef> values,
                                Iterable<Number> docToOrd) throws IOException {
-        assert sawField(field.name);
         assert field.getDocValuesType() == DocValuesType.SORTED;
 
         Tuple fieldTuple = segmentTuple.add(field.name).add(DocValuesType.SORTED.ordinal());
@@ -132,18 +123,32 @@ class FDBDocValuesConsumer extends DocValuesConsumer
     public void addSortedSetField(FieldInfo field,
                                   Iterable<BytesRef> values,
                                   Iterable<Number> docToOrdCount,
-                                  Iterable<Number> ords) throws IOException {
-        assert sawField(field.name);
+                                  Iterable<Number> ords) {
+        //System.out.println("addSortedSetField: " + field.name);
+        //System.out.println("  values: " + countEm(values));
+        //for(BytesRef ref : values) {
+        //    System.out.println("    " + new String(ref.bytes, ref.offset, ref.length));
+        //}
+        //System.out.println("  docToOrdCount: " + countEm(docToOrdCount));
+        //for(Number n : docToOrdCount) {
+        //    System.out.println("    " + n);
+        //}
+        //System.out.println("  ords:" + countEm(ords));
+        //for(Number n : ords) {
+        //    System.out.println("    " + n);
+        //}
+        //System.out.flush();
+
         assert field.getDocValuesType() == DocValuesType.SORTED_SET;
 
         Tuple fieldTuple = segmentTuple.add(field.name).add(DocValuesType.SORTED_SET.ordinal());
 
         {
             Tuple bytesTuple = fieldTuple.add(BYTES);
-            int bytesWritten = 0;
+            int curOrd = 0;
             for(BytesRef value : values) {
-                dir.txn.set(bytesTuple.add(bytesWritten).pack(), Tuple.from().add(FDBDirectory.copyRange(value)).pack());
-                ++bytesWritten;
+                dir.txn.set(bytesTuple.add(curOrd).pack(), Tuple.from().add(FDBDirectory.copyRange(value)).pack());
+                ++curOrd;
             }
         }
 
@@ -165,6 +170,5 @@ class FDBDocValuesConsumer extends DocValuesConsumer
     @Override
     public void close() throws IOException {
         // None
-        assert !fieldsSeen.isEmpty();
     }
 }
