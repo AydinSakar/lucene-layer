@@ -28,7 +28,7 @@ class FDBDocValuesProducer extends DocValuesProducer
 
     public FDBDocValuesProducer(SegmentReadState state, String ext) {
         //System.out.println("Producer: " + state.segmentInfo.name +", " + state.segmentSuffix + ", " + ext); System.out.flush();
-        this.dir = FDBDirectory.unwrapFDBDirectory(state.directory);
+        this.dir = Util.unwrapDirectory(state.directory);
         this.segmentTuple = dir.subspace.add(state.segmentInfo.name).add(state.segmentSuffix).add(ext);
     }
 

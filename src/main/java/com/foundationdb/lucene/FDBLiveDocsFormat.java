@@ -42,7 +42,7 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
 
         assert info.hasDeletions() : "Has no deletions";
 
-        FDBDirectory dir = FDBDirectory.unwrapFDBDirectory(directory);
+        FDBDirectory dir = Util.unwrapDirectory(directory);
         Tuple livTuple = makeLivTuple(dir, info);
 
         byte[] sizeBytes = dir.txn.get(livTuple.pack()).get();
@@ -61,7 +61,7 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
     public void writeLiveDocs(MutableBits liveDocs, Directory directory, SegmentInfoPerCommit info, int newDelCount, IOContext context) {
         neverCalled();
 
-        FDBDirectory dir = FDBDirectory.unwrapFDBDirectory(directory);
+        FDBDirectory dir = Util.unwrapDirectory(directory);
         Tuple livTuple = makeLivTuple(dir, info);
 
         FDBBits bits = (FDBBits)liveDocs;

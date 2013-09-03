@@ -75,7 +75,7 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
         private final FieldInfos fieldInfos;
 
         public FDBStoredFieldsReader(Directory dirIn, SegmentInfo si, FieldInfos fn) {
-            this.dir = FDBDirectory.unwrapFDBDirectory(dirIn);
+            this.dir = Util.unwrapDirectory(dirIn);
             this.segmentTuple = dir.subspace.add(si.name).add(STORED_FIELDS_EXTENSION);
             this.fieldInfos = fn;
         }
@@ -176,7 +176,7 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
 
 
         public FDBStoredFieldsWriter(Directory dirIn, String segment) {
-            this.dir = FDBDirectory.unwrapFDBDirectory(dirIn);
+            this.dir = Util.unwrapDirectory(dirIn);
             this.segmentTuple = dir.subspace.add(segment).add(STORED_FIELDS_EXTENSION);
         }
 
@@ -209,7 +209,7 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
             } else if(field.binaryValue() != null) {
                 type = TYPE_BINARY;
                 BytesRef bytesRef = field.binaryValue();
-                value = FDBDirectory.copyRange(bytesRef);
+                value = Util.copyRange(bytesRef);
             } else if(field.stringValue() != null) {
                 type = TYPE_STRING;
                 value = field.stringValue();
@@ -233,7 +233,7 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
             dir.txn.set(typeKey, Tuple.from(type, index).pack());
 
             Tuple dataTuple = makeFieldDataTuple(docTuple, info.number, index);
-            FDBDirectory.writeLargeValue(dir.txn, dataTuple, LARGE_VALUE_BLOCK_SIZE, Tuple.from(value).pack());
+            Util.writeLargeValue(dir.txn, dataTuple, LARGE_VALUE_BLOCK_SIZE, Tuple.from(value).pack());
         }
 
         @Override

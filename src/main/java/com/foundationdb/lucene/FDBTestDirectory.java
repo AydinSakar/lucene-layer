@@ -1,89 +1,109 @@
-/**
- * Copyright (C) 2009-2013 FoundationDB, LLC
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package com.foundationdb.lucene;
 
-import com.foundationdb.Cluster;
-import com.foundationdb.Database;
-import com.foundationdb.FDB;
 import com.foundationdb.Transaction;
-import com.foundationdb.async.Function;
 import com.foundationdb.tuple.Tuple;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.IndexInput;
+import org.apache.lucene.store.IndexOutput;
+import org.apache.lucene.store.LockFactory;
+import org.apache.lucene.store.NoLockFactory;
 
-import java.nio.charset.Charset;
-import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
+import java.util.Collection;
 
-public class FDBTestDirectory extends FDBDirectory
+public class FDBTestDirectory extends FSDirectory
 {
-  private static final Random RND = new Random();
-  private static final byte[] DEFAULT_DB_NAME = "DB".getBytes(Charset.forName("UTF8"));
-
-  private static FDB fdb;
-  private static Database fdbDB;
-
-  public FDBTestDirectory() {
-    super(String.format("dir_%d", RND.nextInt(100000)), newTransactionForTest());
-  }
+    private final FDBDirectory fdbDir;
+    private FDBTestDirectory subDir;
+    private int subDirCount;
+    private boolean closed;
 
 
-  /** Find the system thread group. By default, threads in this group won't trigger failures in Lucene/Solr tests. **/
-  private static ThreadGroup getSystemThreadGroup() {
-    ThreadGroup tg = Thread.currentThread().getThreadGroup();
-    while(tg != null && !"system".equals(tg.getName())) {
-      tg = tg.getParent();
+    @SuppressWarnings("UnusedDeclaration") // Invoked dynamically via tests
+    public FDBTestDirectory(File path) throws IOException {
+        this(path, Util.test_CreateTransaction());
+        // Note: Not ideal, as 'this' escapes, but fully constructed at this point
+        Util.test_SetDirectory(this);
     }
-    return tg;
-  }
 
-  private static synchronized void initFDB() {
-    FDBTestDirectory.fdb = FDB.selectAPIVersion(100);
-
-    final ThreadGroup threadGroup = getSystemThreadGroup();
-    ExecutorService executor = Executors.newCachedThreadPool(
-        new ThreadFactory() {
-          @Override
-          public Thread newThread(Runnable r) {
-            return new Thread(threadGroup, r);
-          }
-        }
-    );
-
-    fdb.startNetwork(executor);
-    Cluster cluster = fdb.createCluster(null, executor);
-    FDBTestDirectory.fdbDB = cluster.openDatabase(DEFAULT_DB_NAME);
-    FDBTestDirectory.fdbDB.run(
-        new Function<Transaction, Void>()
-        {
-          @Override
-          public Void apply(Transaction transaction) {
-            transaction.clear(Tuple.from(ROOT_PREFIX).range());
-            return null;
-          }
-        }
-    );
-  }
-
-  private static synchronized Transaction newTransactionForTest() {
-    if(fdb == null) {
-      initFDB();
+    private FDBTestDirectory(File path, Transaction txn) throws IOException {
+        this(path, txn, NoLockFactory.getNoLockFactory());
     }
-    return fdbDB.createTransaction();
-  }
+
+    private FDBTestDirectory(File path, Transaction txn, LockFactory lockFactory) throws IOException {
+        super(path, lockFactory);
+        assert txn != null;
+        Tuple subspace = Tuple.from(Util.DEFAULT_TEST_ROOT_PREFIX, path.getAbsolutePath());
+        this.fdbDir = new FDBDirectory(subspace, txn, lockFactory);
+    }
+
+    public FDBDirectory getFDBDirectory() {
+        return fdbDir;
+    }
+
+    synchronized FDBTestDirectory getSubDir() {
+        if(subDir == null || subDir.closed) {
+            File path = new File(getDirectory(), "SubDir_" + subDirCount++);
+            try {
+                subDir = new FDBTestDirectory(path, Util.test_CreateTransaction());
+            } catch(IOException e) {
+                throw new IllegalStateException("Constructor threw", e);
+            }
+        }
+        return subDir;
+    }
+
+
+    //
+    // Directory
+    //
+
+    @Override
+    public String[] listAll() {
+        return fdbDir.listAll();
+
+    }
+
+    @Override
+    public boolean fileExists(String name) {
+        return fdbDir.fileExists(name);
+    }
+
+    @Override
+    public void deleteFile(String name) throws IOException {
+        fdbDir.deleteFile(name);
+    }
+
+    @Override
+    public long fileLength(String name) throws IOException {
+        return fdbDir.fileLength(name);
+    }
+
+    @Override
+    public IndexOutput createOutput(String name, IOContext context) throws FileAlreadyExistsException {
+        return fdbDir.createOutput(name, context);
+    }
+
+    @Override
+    public void sync(Collection<String> names) {
+        fdbDir.sync(names);
+    }
+
+    @Override
+    public IndexInput openInput(String name, IOContext context) throws IOException {
+        return fdbDir.openInput(name, context);
+    }
+
+    @Override
+    public void close() {
+        if(subDir != null) {
+            subDir.close();
+        }
+        fdbDir.close();
+        Util.test_ClearDirectory(this);
+        closed = true;
+    }
 }

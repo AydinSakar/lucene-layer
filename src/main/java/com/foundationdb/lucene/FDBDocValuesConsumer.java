@@ -45,7 +45,7 @@ class FDBDocValuesConsumer extends DocValuesConsumer
 
     public FDBDocValuesConsumer(SegmentWriteState state, String ext) throws IOException {
         //System.out.println("Consumer: " + state.segmentInfo.name +", " + state.segmentSuffix + ", " + ext); System.out.flush();
-        dir = FDBDirectory.unwrapFDBDirectory(state.directory);
+        dir = Util.unwrapDirectory(state.directory);
         segmentTuple = dir.subspace.add(state.segmentInfo.name).add(state.segmentSuffix).add(ext);
         numDocs = state.segmentInfo.getDocCount();
     }
@@ -81,7 +81,7 @@ class FDBDocValuesConsumer extends DocValuesConsumer
         int numDocsWritten = 0;
         for(BytesRef value : values) {
             //System.out.println("  write binary: " + field.name + ", doc: " + numDocsWritten); System.out.flush();
-            dir.txn.set(fieldTuple.add(numDocsWritten).pack(), Tuple.from().add(FDBDirectory.copyRange(value)).pack());
+            dir.txn.set(fieldTuple.add(numDocsWritten).pack(), Tuple.from().add(Util.copyRange(value)).pack());
             ++numDocsWritten;
         }
 
@@ -100,7 +100,7 @@ class FDBDocValuesConsumer extends DocValuesConsumer
             Tuple bytesTuple = fieldTuple.add(BYTES);
             int ordNum = 0;
             for(BytesRef value : values) {
-                dir.txn.set(bytesTuple.add(ordNum).pack(), Tuple.from().add(FDBDirectory.copyRange(value)).pack());
+                dir.txn.set(bytesTuple.add(ordNum).pack(), Tuple.from().add(Util.copyRange(value)).pack());
                 ++ordNum;
             }
         }
@@ -147,7 +147,7 @@ class FDBDocValuesConsumer extends DocValuesConsumer
             Tuple bytesTuple = fieldTuple.add(BYTES);
             int curOrd = 0;
             for(BytesRef value : values) {
-                dir.txn.set(bytesTuple.add(curOrd).pack(), Tuple.from().add(FDBDirectory.copyRange(value)).pack());
+                dir.txn.set(bytesTuple.add(curOrd).pack(), Tuple.from().add(Util.copyRange(value)).pack());
                 ++curOrd;
             }
         }

@@ -65,7 +65,7 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
     {
         @Override
         public FieldInfos read(Directory directory, String segmentName, IOContext iocontext) {
-            FDBDirectory fdbDir = FDBDirectory.unwrapFDBDirectory(directory);
+            FDBDirectory fdbDir = Util.unwrapDirectory(directory);
             Transaction txn = fdbDir.txn;
             Tuple tuple = fdbDir.subspace.add(segmentName).add(FIELD_INFOS_EXTENSION);
 
@@ -130,7 +130,7 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
     {
         @Override
         public void write(Directory directory, String segmentName, FieldInfos infos, IOContext context) {
-            FDBDirectory fdbDir = FDBDirectory.unwrapFDBDirectory(directory);
+            FDBDirectory fdbDir = Util.unwrapDirectory(directory);
             Transaction txn = fdbDir.txn;
             Tuple tuple = fdbDir.subspace.add(segmentName).add(FIELD_INFOS_EXTENSION);
 

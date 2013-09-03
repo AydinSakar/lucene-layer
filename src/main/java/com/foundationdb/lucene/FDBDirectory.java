@@ -3,136 +3,56 @@ package com.foundationdb.lucene;
 import com.foundationdb.KeyValue;
 import com.foundationdb.Transaction;
 import com.foundationdb.async.AsyncIterator;
-import com.foundationdb.tuple.ByteArrayUtil;
 import com.foundationdb.tuple.Tuple;
-import org.apache.lucene.store.CompoundFileDirectory;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
+import org.apache.lucene.store.LockFactory;
 import org.apache.lucene.store.NoLockFactory;
 import org.apache.lucene.store.RAMFile;
 import org.apache.lucene.store.RAMInputStream;
 import org.apache.lucene.store.RAMOutputStream;
-import org.apache.lucene.util.BytesRef;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
 public class FDBDirectory extends Directory
 {
-    protected static final String ROOT_PREFIX = "lucene";
-    private static final String SPECIAL_STRING = new String();
-
     /** See {@link RAMInputStream#BUFFER_SIZE} */
     private static final int BUFFER_SIZE = 1024;
 
     public Transaction txn;
     public final Tuple subspace;
-
     private final Tuple dirSubspace;
     private final Tuple dataSubspace;
 
 
     public FDBDirectory(String path, Transaction txn) {
+        this(Tuple.from(Util.DEFAULT_ROOT_PREFIX, path), txn);
+    }
+
+    public FDBDirectory(Tuple subspace, Transaction txn) {
+        this(subspace, txn, NoLockFactory.getNoLockFactory());
+    }
+
+    FDBDirectory(Tuple subspace, Transaction txn, LockFactory lockFactory) {
+        assert subspace != null;
+        assert txn != null;
+        assert lockFactory != null;
         this.txn = txn;
-        this.subspace = Tuple.from(ROOT_PREFIX, path);
+        this.subspace = subspace;
         this.dirSubspace = subspace.add(0);
         this.dataSubspace = subspace.add(1);
         try {
-            setLockFactory(NoLockFactory.getNoLockFactory());
+            setLockFactory(lockFactory);
         } catch(IOException e) {
-            throw new IllegalStateException("NoLockFactory through IOException", e);
-        }
-    }
-
-    public static FDBDirectory unwrapFDBDirectory(Directory directory) {
-        if(directory instanceof FDBDirectory) {
-            return (FDBDirectory) directory;
-        }
-        if(directory instanceof CompoundFileDirectory) {
-            return unwrapFDBDirectory(((CompoundFileDirectory) directory).getDirectory());
-        }
-        Exception cause = null;
-        try {
-            directory.fileExists(SPECIAL_STRING);
-        } catch(TestWorkaroundException e) {
-            return e.getFDBDirectory();
-        } catch(IOException e) {
-            cause = e;
-        }
-        throw new IllegalStateException("Expected TestWorkaroundException", cause);
-    }
-
-    static byte[] copyRange(BytesRef ref) {
-        if(ref == null) {
-            return null;
-        }
-        return Arrays.copyOfRange(ref.bytes, ref.offset, ref.offset + ref.length);
-    }
-
-    static long unpackLongForAtomic(byte[] bytes, int index) {
-        return (bytes[index] & 0xFFL) | (bytes[index + 1] & 0xFFL) << 8 | (bytes[index + 2] & 0xFFL) << 16 | (bytes[index + 3] & 0xFFL) << 24 | (bytes[index + 4] & 0xFFL) << 32 | (bytes[index + 5] & 0xFFL) << 40 | (bytes[index + 6] & 0xFFL) << 48 | (bytes[index + 7] & 0xFFL) << 56;
-    }
-
-    public static long unpackLongForAtomic(byte[] bytes) {
-        if(bytes == null) {
-            return 0;
-        }
-        assert bytes.length == 8 : bytes.length;
-        return unpackLongForAtomic(bytes, 0);
-    }
-
-    static String tupleStr(Tuple t) {
-        StringBuilder sb = new StringBuilder();
-        sb.append('(');
-        boolean first = true;
-        for(Object o : t.getItems()) {
-            if(!first) {
-                sb.append(",");
-            }
-            first = false;
-            if(o instanceof byte[]) {
-                sb.append(ByteArrayUtil.printable((byte[]) o));
-            } else {
-                sb.append(o);
-            }
-        }
-        sb.append(')');
-        return sb.toString();
-    }
-
-
-    /**
-     * Write a potentially large value into multiple values of, at most, chunkSize. Keys are formed by appending the
-     * running total to baseTuple.
-     */
-    public static int writeLargeValue(Transaction txn, Tuple baseTuple, int chunkSize, byte[] value) {
-        int chunks = 0;
-        int bytesWritten = 0;
-        while(bytesWritten < value.length) {
-            ++chunks;
-            int toWrite = Math.min(chunkSize, value.length - bytesWritten);
-            txn.set(
-                    baseTuple.add(bytesWritten).pack(),
-                    Arrays.copyOfRange(value, bytesWritten, bytesWritten + toWrite)
-            );
-            bytesWritten += toWrite;
-        }
-        assert bytesWritten == value.length;
-        return chunks;
-    }
-
-    private class TestWorkaroundException extends RuntimeException
-    {
-        public FDBDirectory getFDBDirectory() {
-            return FDBDirectory.this;
+            throw new IllegalStateException("setLockFactory threw", e);
         }
     }
 
@@ -164,10 +84,9 @@ public class FDBDirectory extends Directory
             try {
                 // Sets file length
                 super.flush();
-
-                byte[] outValue = new byte[(int) length()];
+                byte[] outValue = new byte[(int)length()];
                 writeTo(outValue, 0);
-                writeLargeValue(txn, dataSubspace.add(dataID), BUFFER_SIZE, outValue);
+                Util.writeLargeValue(txn, dataSubspace.add(dataID), BUFFER_SIZE, outValue);
             } catch(IOException e) {
                 throw new RuntimeException(e);
             }
@@ -226,10 +145,7 @@ public class FDBDirectory extends Directory
 
     @Override
     public boolean fileExists(String name) {
-        //noinspection StringEquality
-        if(name == SPECIAL_STRING) {
-            throw new TestWorkaroundException();
-        }
+        Util.specialFileExists(name, this);
         return getDataID(name) != -1;
     }
 
@@ -280,6 +196,7 @@ public class FDBDirectory extends Directory
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
+        // None
     }
 }

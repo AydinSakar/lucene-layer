@@ -30,10 +30,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import static com.foundationdb.lucene.FDBDirectory.copyRange;
-import static com.foundationdb.lucene.FDBDirectory.unpackLongForAtomic;
-
-
 //
 // (dirTuple, segmentName, "pst", fieldNum, termBytes, "numDocs") => (atomic_op_num)
 // (dirTuple, segmentName, "pst", fieldNum, termBytes, docID0) => ([termDocFreq])
@@ -43,7 +39,7 @@ public final class FDBPostingsFormat extends PostingsFormat
 {
     private static final String POSTINGS_EXTENSION = "pst";
     private static final String NUM_DOCS = "numDocs";
-    private static final byte[] ATOMIC_OP_LONG_1 = { 1, 0, 0, 0, 0, 0, 0, 0 };
+    private static final byte[] LITTLE_ENDIAN_LONG_ONE = { 1, 0, 0, 0, 0, 0, 0, 0 };
 
 
     public FDBPostingsFormat() {
@@ -81,7 +77,7 @@ public final class FDBPostingsFormat extends PostingsFormat
 
         public FDBFieldsProducer(SegmentReadState state) {
             this.fieldInfos = state.fieldInfos;
-            this.dir = FDBDirectory.unwrapFDBDirectory(state.directory);
+            this.dir = Util.unwrapDirectory(state.directory);
             this.segmentTuple = dir.subspace.add(state.segmentInfo.name).add(POSTINGS_EXTENSION);
         }
 
@@ -131,7 +127,7 @@ public final class FDBPostingsFormat extends PostingsFormat
         private final Tuple segmentTuple;
 
         public FDBFieldsConsumer(SegmentWriteState state) {
-            dir = FDBDirectory.unwrapFDBDirectory(state.directory);
+            dir = Util.unwrapDirectory(state.directory);
             segmentTuple = dir.subspace.add(state.segmentInfo.name).add(POSTINGS_EXTENSION);
         }
 
@@ -203,7 +199,7 @@ public final class FDBPostingsFormat extends PostingsFormat
 
         @Override
         public SeekStatus seekCeil(BytesRef text, boolean useCache) {
-            List<KeyValue> range = txn.getRange(fieldTuple.add(copyRange(text)).pack(), fieldTuple.range().end, 1)
+            List<KeyValue> range = txn.getRange(fieldTuple.add(Util.copyRange(text)).pack(), fieldTuple.range().end, 1)
                                       .asList()
                                       .get();
             if(range.isEmpty()) {
@@ -215,7 +211,7 @@ public final class FDBPostingsFormat extends PostingsFormat
             foundTerm = new BytesRef(term);
 
             // Note: Delicate, NUM_DOCS key sorts first
-            docFreq = (int)unpackLongForAtomic(range.get(0).getValue());
+            docFreq = (int)Util.unpackLittleEndianLong(range.get(0).getValue());
 
             if(foundTerm.equals(text)) {
                 return SeekStatus.FOUND;
@@ -265,7 +261,7 @@ public final class FDBPostingsFormat extends PostingsFormat
         @Override
         public FDBDocsAndPositionsEnum docs(Bits liveDocs, DocsEnum reuse, int flags) {
             // TODO: Reuse?
-            Tuple termTuple = fieldTuple.add(copyRange(foundTerm));
+            Tuple termTuple = fieldTuple.add(Util.copyRange(foundTerm));
             return new FDBDocsAndPositionsEnum(txn, termTuple, liveDocs, indexOptions, docFreq);
         }
 
@@ -460,11 +456,10 @@ public final class FDBPostingsFormat extends PostingsFormat
             this.indexOptions = field.getIndexOptions();
             writePositions = indexOptions.compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS) >= 0;
             writeOffsets = indexOptions.compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS) >= 0;
-            assert !writeOffsets;
         }
 
         public FDBPostingsConsumer startTerm(BytesRef term, Tuple fieldTuple) {
-            this.termTuple = fieldTuple.add(FDBDirectory.copyRange(term));
+            this.termTuple = fieldTuple.add(Util.copyRange(term));
             // Deferred, as term might have zero docs
             wroteNumDocs = false;
             return this;
@@ -473,10 +468,10 @@ public final class FDBPostingsFormat extends PostingsFormat
         @Override
         public void startDoc(int docID, int termDocFreq) {
             if(!wroteNumDocs) {
-                txn.set(termTuple.add(NUM_DOCS).pack(), ATOMIC_OP_LONG_1);
+                txn.set(termTuple.add(NUM_DOCS).pack(), LITTLE_ENDIAN_LONG_ONE);
                 wroteNumDocs = true;
             } else {
-                txn.mutate(MutationType.ADD, termTuple.add(NUM_DOCS).pack(), ATOMIC_OP_LONG_1);
+                txn.mutate(MutationType.ADD, termTuple.add(NUM_DOCS).pack(), LITTLE_ENDIAN_LONG_ONE);
             }
             docTuple = termTuple.add(docID);
 
@@ -492,7 +487,7 @@ public final class FDBPostingsFormat extends PostingsFormat
         public void addPosition(int position, BytesRef payload, int startOffset, int endOffset) {
             // If there is anything to write, just write it all (positions and offsets are tiny)
             if(writePositions || writeOffsets || (payload != null && payload.length > 0)) {
-                Tuple valueTuple = Tuple.from(startOffset, endOffset, FDBDirectory.copyRange(payload));
+                Tuple valueTuple = Tuple.from(startOffset, endOffset, Util.copyRange(payload));
                 txn.set(docTuple.add(position).pack(), valueTuple.pack());
             }
         }

@@ -52,7 +52,7 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
     {
         @Override
         public SegmentInfo read(Directory dirIn, String segmentName, IOContext context) throws IOException {
-            FDBDirectory dir = FDBDirectory.unwrapFDBDirectory(dirIn);
+            FDBDirectory dir = Util.unwrapDirectory(dirIn);
             Transaction txn = dir.txn;
             Tuple segmentTuple = dir.subspace.add(segmentName).add(SI_EXTENSION);
 
@@ -130,7 +130,7 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
     {
         @Override
         public void write(Directory dirIn, SegmentInfo si, FieldInfos fis, IOContext ioContext) throws IOException {
-            FDBDirectory dir = FDBDirectory.unwrapFDBDirectory(dirIn);
+            FDBDirectory dir = Util.unwrapDirectory(dirIn);
             Transaction txn = dir.txn;
 
             Tuple segmentTuple = dir.subspace.add(si.name).add(SI_EXTENSION);

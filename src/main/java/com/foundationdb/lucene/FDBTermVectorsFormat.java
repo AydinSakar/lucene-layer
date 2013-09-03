@@ -68,7 +68,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
         private final Tuple segmentTuple;
 
         public FDBTermVectorsReader(Directory directory, SegmentInfo si) {
-            this.dir = FDBDirectory.unwrapFDBDirectory(directory);
+            this.dir = Util.unwrapDirectory(directory);
             this.segmentTuple = dir.subspace.add(si.name).add(VECTORS_EXTENSION);
         }
 
@@ -122,7 +122,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
             int index = 0;
             for(KeyValue kv : dir.txn.getRange(termTuple.range())) {
                 Tuple keyTuple = Tuple.fromBytes(kv.getKey());
-                assert keyTuple.size() == termTuple.size() + 1 : "Unexpected key: " + FDBDirectory.tupleStr(keyTuple);
+                assert keyTuple.size() == termTuple.size() + 1 : "Unexpected key: " + Util.tupleString(keyTuple);
 
                 Tuple valueTuple = Tuple.fromBytes(kv.getValue());
                 if(field.hasPositions) {
@@ -236,7 +236,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
 
             @Override
             public SeekStatus seekCeil(BytesRef text, boolean useCache) {
-                byte[] begin = termsTuple.add(FDBDirectory.copyRange(text)).pack();
+                byte[] begin = termsTuple.add(Util.copyRange(text)).pack();
                 byte[] end = termsTuple.range().end;
                 it = dir.txn.getRange(begin, end).iterator();
                 advance();
@@ -287,7 +287,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
             @Override
             public DocsAndPositionsEnum docsAndPositions(Bits liveDocs, DocsAndPositionsEnum reuse, int flags) {
                 // TODO: reuse?
-                Tuple postingsTuple = termsTuple.add(FDBDirectory.copyRange(curTerm));
+                Tuple postingsTuple = termsTuple.add(Util.copyRange(curTerm));
                 TVPostings postings = loadPostings(field, curFreq, postingsTuple);
                 if(postings.positions == null && postings.startOffsets == null) {
                     return null;
@@ -323,7 +323,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
 
 
         public FDBTermVectorsWriter(Directory directory, String segmentName) {
-            this.dir = FDBDirectory.unwrapFDBDirectory(directory);
+            this.dir = Util.unwrapDirectory(directory);
             this.segmentTuple = dir.subspace.add(segmentName).add(VECTORS_EXTENSION);
         }
 
@@ -348,7 +348,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
 
         @Override
         public void startTerm(BytesRef term, int freq) {
-            termTuple = docTuple.add(TERMS).add(curField.name).add(FDBDirectory.copyRange(term));
+            termTuple = docTuple.add(TERMS).add(curField.name).add(Util.copyRange(term));
             dir.txn.set(termTuple.pack(), Tuple.from(freq).pack());
             ++numTermsWritten;
         }
@@ -359,7 +359,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
             Tuple valueTuple = Tuple.from(
                     hasOffsets ? startOffset : null,
                     hasOffsets ? endOffset : null,
-                    hasPayloads ? FDBDirectory.copyRange(payload) : null
+                    hasPayloads ? Util.copyRange(payload) : null
             );
             txn.set(termTuple.add(position).pack(), valueTuple.pack());
         }
