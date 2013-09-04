@@ -8,6 +8,9 @@ import org.apache.lucene.index.SegmentWriteState;
 
 import java.io.IOException;
 
+//
+// Just like FDBDocValuesFormat, but extension is "len" instead of "dat"
+//
 public class FDBNormsFormat extends NormsFormat
 {
     private static final String NORMS_SEG_EXTENSION = "len";
@@ -22,20 +25,16 @@ public class FDBNormsFormat extends NormsFormat
         return new FDBNormsProducer(state);
     }
 
-    public static class FDBNormsProducer extends FDBDocValuesProducer
+    public static class FDBNormsProducer extends FDBDocValuesFormat.FDBDocValuesProducer
     {
         public FDBNormsProducer(SegmentReadState state) throws IOException {
-            // All we do is change the extension from .dat -> .len;
-            // otherwise this is a normal simple doc values file:
             super(state, NORMS_SEG_EXTENSION);
         }
     }
 
-    public static class FDBNormsConsumer extends FDBDocValuesConsumer
+    public static class FDBNormsConsumer extends FDBDocValuesFormat.FDBDocValuesConsumer
     {
         public FDBNormsConsumer(SegmentWriteState state) throws IOException {
-            // All we do is change the extension from .dat -> .len;
-            // otherwise this is a normal simple doc values file:
             super(state, NORMS_SEG_EXTENSION);
         }
     }
