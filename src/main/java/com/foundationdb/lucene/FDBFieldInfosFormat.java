@@ -21,21 +21,15 @@ import java.util.Map;
 public class FDBFieldInfosFormat extends FieldInfosFormat
 {
     private static final String FIELD_INFOS_EXTENSION = "inf";
-    private static final String NUMFIELDS = "number of fields";
     private static final String NAME = "name";
-    private static final String NUMBER = "number";
-    private static final String ISINDEXED = "indexed";
-    private static final String STORETV = "term vectors";
-    private static final String STORETVPOS = "term vector positions";
-    private static final String STORETVOFF = "term vector offsets";
-    private static final String PAYLOADS = "payloads";
-    private static final String NORMS = "norms";
-    private static final String NORMS_TYPE = "norms type";
-    private static final String DOCVALUES = "doc values";
-    private static final String INDEXOPTIONS = "index options";
-    private static final String ATTRS = "attributes";
-    private static final String ATT_KEY = "key";
-    private static final String ATT_VALUE = "value";
+    private static final String IS_INDEXED = "indexed";
+    private static final String HAS_VECTORS = "has_vectors";
+    private static final String HAS_PAYLOADS = "has_payloads";
+    private static final String HAS_NORMS = "has_norms";
+    private static final String NORMS_TYPE = "norms_type";
+    private static final String DOC_VALUES_TYPE = "doc_values_type";
+    private static final String INDEX_OPTIONS = "index_options";
+    private static final String ATTR = "attr";
 
 
     private final FieldInfosReader reader = new Reader();
@@ -64,18 +58,16 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
     private static class Reader extends FieldInfosReader
     {
         @Override
-        public FieldInfos read(Directory directory, String segmentName, IOContext iocontext) {
-            FDBDirectory fdbDir = Util.unwrapDirectory(directory);
-            Transaction txn = fdbDir.txn;
-            Tuple tuple = fdbDir.subspace.add(segmentName).add(FIELD_INFOS_EXTENSION);
+        public FieldInfos read(Directory dirIn, String segmentName, IOContext iocontext) {
+            final FDBDirectory dir = Util.unwrapDirectory(dirIn);
+            final Tuple segmentTuple = dir.subspace.add(segmentName).add(FIELD_INFOS_EXTENSION);
 
             List<FieldInfo> fieldInfos = new ArrayList<FieldInfo>();
-
             int lastFieldNum = -1;
             InfoBuilder info = null;
-            for(KeyValue kv : txn.getRange(tuple.range())) {
+            for(KeyValue kv : dir.txn.getRange(segmentTuple.range())) {
                 Tuple fieldTuple = Tuple.fromBytes(kv.getKey());
-                int fieldNum = (int) fieldTuple.getLong(tuple.size());
+                int fieldNum = (int)fieldTuple.getLong(segmentTuple.size());
                 if(fieldNum != lastFieldNum) {
                     if(info != null) {
                         fieldInfos.add(info.build(lastFieldNum));
@@ -83,31 +75,28 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
                     info = new InfoBuilder();
                     lastFieldNum = fieldNum;
                 }
-                String key = fieldTuple.getString(tuple.size() + 1);
+                String key = fieldTuple.getString(segmentTuple.size() + 1);
                 Tuple value = Tuple.fromBytes(kv.getValue());
                 if(key.equals(NAME)) {
                     info.name = value.getString(0);
-                } else if(key.equals(ISINDEXED)) {
-                    info.isIndexed = value.getLong(0) == 1;
-                } else if(key.equals(STORETV)) {
-                    info.storeTermVector = value.getLong(0) == 1;
-                }
-                //case FDBFieldInfosWriter.STORETVPOS:
-                //case FDBFieldInfosWriter.STORETVOFF
-                else if(key.equals(PAYLOADS)) {
-                    info.storePayloads = value.getLong(0) == 1;
-                } else if(key.equals(NORMS)) {
-                    info.omitNorms = !(value.getLong(0) == 1);
+                } else if(key.equals(IS_INDEXED)) {
+                    info.isIndexed = getBool(value, 0);
+                } else if(key.equals(HAS_VECTORS)) {
+                    info.storeTermVector = getBool(value, 0);
+                } else if(key.equals(HAS_PAYLOADS)) {
+                    info.storePayloads = getBool(value, 0);
+                } else if(key.equals(HAS_NORMS)) {
+                    info.omitNorms = !getBool(value, 0);
                 } else if(key.equals(NORMS_TYPE)) {
-                    String nrmType = value.getString(0);
-                    info.normsType = stringToDocValuesType(nrmType);
-                } else if(key.equals(DOCVALUES)) {
-                    String dvType = value.getString(0);
-                    info.docValuesType = stringToDocValuesType(dvType);
-                } else if(key.equals(INDEXOPTIONS)) {
+                    String normType = value.getString(0);
+                    info.normsType = stringToDocValuesType(normType);
+                } else if(key.equals(DOC_VALUES_TYPE)) {
+                    String docValueType = value.getString(0);
+                    info.docValuesType = stringToDocValuesType(docValueType);
+                } else if(key.equals(INDEX_OPTIONS)) {
                     info.indexOptions = IndexOptions.valueOf(value.getString(0));
-                } else if(key.equals(ATTRS)) {
-                    info.atts.put(fieldTuple.getString(tuple.size() + 2), value.getString(0));
+                } else if(key.equals(ATTR)) {
+                    info.attrs.put(fieldTuple.getString(segmentTuple.size() + 2), value.getString(0));
                 } else {
                     throw new IllegalStateException("Unknown key: " + key);
                 }
@@ -129,32 +118,31 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
     private static class Writer extends FieldInfosWriter
     {
         @Override
-        public void write(Directory directory, String segmentName, FieldInfos infos, IOContext context) {
-            FDBDirectory fdbDir = Util.unwrapDirectory(directory);
-            Transaction txn = fdbDir.txn;
-            Tuple tuple = fdbDir.subspace.add(segmentName).add(FIELD_INFOS_EXTENSION);
+        public void write(Directory dirIn, String segmentName, FieldInfos infos, IOContext context) {
+            final FDBDirectory dir = Util.unwrapDirectory(dirIn);
+            final Tuple segmentTuple = dir.subspace.add(segmentName).add(FIELD_INFOS_EXTENSION);
 
             for(FieldInfo fi : infos) {
-                final Tuple fieldTuple = tuple.add(fi.number);
-                set(txn, fieldTuple, NAME, fi.name);
-                set(txn, fieldTuple, ISINDEXED, fi.isIndexed());
+                final Tuple fieldTuple = segmentTuple.add(fi.number);
+                set(dir.txn, fieldTuple, NAME, fi.name);
+                set(dir.txn, fieldTuple, IS_INDEXED, fi.isIndexed());
 
                 if(fi.isIndexed()) {
-                    assert fi.getIndexOptions()
-                             .compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS) >= 0 || !fi.hasPayloads();
-                    set(txn, fieldTuple, INDEXOPTIONS, fi.getIndexOptions().toString());
+                    assert fi.getIndexOptions().compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS) >= 0 ||
+                           !fi.hasPayloads();
+                    set(dir.txn, fieldTuple, INDEX_OPTIONS, fi.getIndexOptions().toString());
                 }
 
-                set(txn, fieldTuple, STORETV, fi.hasVectors());
-                set(txn, fieldTuple, PAYLOADS, fi.hasPayloads());
-                set(txn, fieldTuple, NORMS, !fi.omitsNorms());
-                set(txn, fieldTuple, NORMS_TYPE, docValuesTypeToString(fi.getNormType()));
-                set(txn, fieldTuple, DOCVALUES, docValuesTypeToString(fi.getDocValuesType()));
+                set(dir.txn, fieldTuple, HAS_VECTORS, fi.hasVectors());
+                set(dir.txn, fieldTuple, HAS_PAYLOADS, fi.hasPayloads());
+                set(dir.txn, fieldTuple, HAS_NORMS, !fi.omitsNorms());
+                set(dir.txn, fieldTuple, NORMS_TYPE, docValuesTypeToString(fi.getNormType()));
+                set(dir.txn, fieldTuple, DOC_VALUES_TYPE, docValuesTypeToString(fi.getDocValuesType()));
 
-                Tuple attrTuple = fieldTuple.add(ATTRS);
                 if(fi.attributes() != null) {
+                    Tuple attrTuple = fieldTuple.add(ATTR);
                     for(Map.Entry<String, String> entry : fi.attributes().entrySet()) {
-                        set(txn, attrTuple, entry.getKey(), entry.getValue());
+                        set(dir.txn, attrTuple, entry.getKey(), entry.getValue());
                     }
                 }
             }
@@ -176,7 +164,7 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
         boolean omitNorms = false;
         DocValuesType normsType = null;
         DocValuesType docValuesType = null;
-        Map<String, String> atts = new HashMap<String, String>();
+        Map<String, String> attrs = new HashMap<String, String>();
 
         public FieldInfo build(int fieldNum) {
             return new FieldInfo(
@@ -189,9 +177,13 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
                     indexOptions,
                     docValuesType,
                     normsType,
-                    atts
+                    attrs
             );
         }
+    }
+
+    private static boolean getBool(Tuple tuple, int index) {
+        return tuple.getLong(index) == 1;
     }
 
     private static void set(Transaction txn, Tuple tuple, String name, String value) {
@@ -203,10 +195,10 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
     }
 
     private static DocValuesType stringToDocValuesType(String dvType) {
-        return "false".equals(dvType) ? null : DocValuesType.valueOf(dvType);
+        return (dvType == null) ? null : DocValuesType.valueOf(dvType);
     }
 
     private static String docValuesTypeToString(DocValuesType type) {
-        return type == null ? "false" : type.toString();
+        return (type == null) ? null : type.name();
     }
 }
