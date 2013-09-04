@@ -36,7 +36,7 @@ import java.util.TreeSet;
 //
 public final class FDBPostingsFormat extends PostingsFormat
 {
-    private static final String POSTINGS_EXTENSION = "pst";
+    private static final String POSTINGS_EXT = "pst";
     private static final String NUM_DOCS = "numDocs";
     private static final byte[] LITTLE_ENDIAN_LONG_ONE = { 1, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -77,7 +77,7 @@ public final class FDBPostingsFormat extends PostingsFormat
         public FDBFieldsProducer(SegmentReadState state) {
             this.fieldInfos = state.fieldInfos;
             this.dir = Util.unwrapDirectory(state.directory);
-            this.segmentTuple = dir.subspace.add(state.segmentInfo.name).add(POSTINGS_EXTENSION);
+            this.segmentTuple = dir.subspace.add(state.segmentInfo.name).add(POSTINGS_EXT);
         }
 
         @Override
@@ -383,7 +383,7 @@ public final class FDBPostingsFormat extends PostingsFormat
 
         public FDBFieldsConsumer(SegmentWriteState state) {
             this.dir = Util.unwrapDirectory(state.directory);
-            this.segmentTuple = dir.subspace.add(state.segmentInfo.name).add(POSTINGS_EXTENSION);
+            this.segmentTuple = dir.subspace.add(state.segmentInfo.name).add(POSTINGS_EXT);
         }
 
         @Override

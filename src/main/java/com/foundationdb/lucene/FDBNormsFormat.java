@@ -13,7 +13,7 @@ import java.io.IOException;
 //
 public class FDBNormsFormat extends NormsFormat
 {
-    private static final String NORMS_SEG_EXTENSION = "len";
+    private static final String NORMS_EXT = "len";
 
     @Override
     public DocValuesConsumer normsConsumer(SegmentWriteState state) throws IOException {
@@ -28,14 +28,14 @@ public class FDBNormsFormat extends NormsFormat
     public static class FDBNormsProducer extends FDBDocValuesFormat.FDBDocValuesProducer
     {
         public FDBNormsProducer(SegmentReadState state) throws IOException {
-            super(state, NORMS_SEG_EXTENSION);
+            super(state, NORMS_EXT);
         }
     }
 
     public static class FDBNormsConsumer extends FDBDocValuesFormat.FDBDocValuesConsumer
     {
         public FDBNormsConsumer(SegmentWriteState state) throws IOException {
-            super(state, NORMS_SEG_EXTENSION);
+            super(state, NORMS_EXT);
         }
     }
 }

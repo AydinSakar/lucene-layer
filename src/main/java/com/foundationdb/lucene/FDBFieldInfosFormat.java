@@ -33,7 +33,7 @@ import java.util.Map;
 //
 public class FDBFieldInfosFormat extends FieldInfosFormat
 {
-    private static final String FIELD_INFOS_EXTENSION = "inf";
+    private static final String FIELD_INFOS_EXT = "inf";
     private static final String NAME = "name";
     private static final String HAS_INDEX = "has_index";
     private static final String HAS_PAYLOADS = "has_payloads";
@@ -73,7 +73,7 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
         @Override
         public FieldInfos read(Directory dirIn, String segmentName, IOContext iocontext) {
             final FDBDirectory dir = Util.unwrapDirectory(dirIn);
-            final Tuple segmentTuple = dir.subspace.add(segmentName).add(FIELD_INFOS_EXTENSION);
+            final Tuple segmentTuple = dir.subspace.add(segmentName).add(FIELD_INFOS_EXT);
 
             List<FieldInfo> fieldInfos = new ArrayList<FieldInfo>();
             int lastFieldNum = -1;
@@ -133,7 +133,7 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
         @Override
         public void write(Directory dirIn, String segmentName, FieldInfos infos, IOContext context) {
             final FDBDirectory dir = Util.unwrapDirectory(dirIn);
-            final Tuple segmentTuple = dir.subspace.add(segmentName).add(FIELD_INFOS_EXTENSION);
+            final Tuple segmentTuple = dir.subspace.add(segmentName).add(FIELD_INFOS_EXT);
 
             for(FieldInfo fi : infos) {
                 final Tuple fieldTuple = segmentTuple.add(fi.number);

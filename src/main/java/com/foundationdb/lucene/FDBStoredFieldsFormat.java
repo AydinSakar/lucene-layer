@@ -30,7 +30,7 @@ import java.util.Set;
 //
 public class FDBStoredFieldsFormat extends StoredFieldsFormat
 {
-    private final static String STORED_FIELDS_EXTENSION = "fld";
+    private final static String STORED_FIELDS_EXT = "fld";
     private final static int FIELD_TYPE_SPACE = 0;
     private final static int FIELD_DATA_SPACE = 1;
     private final static String TYPE_STRING = "string";
@@ -76,7 +76,7 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
 
         public FDBStoredFieldsReader(Directory dirIn, SegmentInfo si, FieldInfos fn) {
             this.dir = Util.unwrapDirectory(dirIn);
-            this.segmentTuple = dir.subspace.add(si.name).add(STORED_FIELDS_EXTENSION);
+            this.segmentTuple = dir.subspace.add(si.name).add(STORED_FIELDS_EXT);
             this.fieldInfos = fn;
         }
 
@@ -177,7 +177,7 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
 
         public FDBStoredFieldsWriter(Directory dirIn, String segment) {
             this.dir = Util.unwrapDirectory(dirIn);
-            this.segmentTuple = dir.subspace.add(segment).add(STORED_FIELDS_EXTENSION);
+            this.segmentTuple = dir.subspace.add(segment).add(STORED_FIELDS_EXT);
         }
 
         @Override

@@ -39,7 +39,7 @@ import java.util.List;
 //
 public class FDBDocValuesFormat extends DocValuesFormat
 {
-    private static final String DOC_VALUES_EXTENSION = "dat";
+    private static final String DOC_VALUES_EXT = "dat";
     private static final String BYTES = "bytes";
     private static final String ORD = "ord";
     private static final String DOC_TO_ORD = "doc_ord";
@@ -56,12 +56,12 @@ public class FDBDocValuesFormat extends DocValuesFormat
 
     @Override
     public DocValuesProducer fieldsProducer(SegmentReadState state) throws IOException {
-        return new FDBDocValuesProducer(state, DOC_VALUES_EXTENSION);
+        return new FDBDocValuesProducer(state, DOC_VALUES_EXT);
     }
 
     @Override
     public DocValuesConsumer fieldsConsumer(SegmentWriteState state) throws IOException {
-        return new FDBDocValuesConsumer(state, DOC_VALUES_EXTENSION);
+        return new FDBDocValuesConsumer(state, DOC_VALUES_EXT);
     }
 
 

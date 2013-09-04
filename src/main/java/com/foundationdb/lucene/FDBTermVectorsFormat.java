@@ -27,20 +27,20 @@ import java.util.List;
 
 
 //
-// (segmentName, "vec", docNum, "fields", fieldName0) => (fieldNum, numTerms, hasPositions, hasOffsets, hasPayloads)
-// (segmentName, "vec", docNum, "fields", fieldName1) => (fieldNum, numTerms, hasPositions, hasOffsets, hasPayloads)
+// (segmentName, "vec", docNum, "field", fieldName0) => (fieldNum, numTerms, hasPositions, hasOffsets, hasPayloads)
+// (segmentName, "vec", docNum, "field", fieldName1) => (fieldNum, numTerms, hasPositions, hasOffsets, hasPayloads)
 // ...
-// (segmentName, "vec", docNum, "terms", fieldName, termBytes0) => (freq)
-// (segmentName, "vec", docNum, "terms", fieldName, termBytes0, posNum0) => (start_offset, end_offset, payload)
-// (segmentName, "vec", docNum, "terms", fieldName, termBytes0, posNum1) => (start_offset, end_offset, payload)
-// (segmentName, "vec", docNum, "terms", fieldName, termBytes1) => (freq)
+// (segmentName, "vec", docNum, "term", fieldName, termBytes0) => (freq)
+// (segmentName, "vec", docNum, "term", fieldName, termBytes0, posNum0) => (start_offset, end_offset, payload)
+// (segmentName, "vec", docNum, "term", fieldName, termBytes0, posNum1) => (start_offset, end_offset, payload)
+// (segmentName, "vec", docNum, "term", fieldName, termBytes1) => (freq)
 // ...
 //
 public class FDBTermVectorsFormat extends TermVectorsFormat
 {
-    private static final String VECTORS_EXTENSION = "vec";
-    private static final String FIELDS = "fields";
-    private static final String TERMS = "terms";
+    private static final String TERM_VECTORS_EXT = "vec";
+    private static final String FIELD = "field";
+    private static final String TERM = "term";
 
 
     //
@@ -69,7 +69,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
 
         public FDBTermVectorsReader(Directory directory, SegmentInfo si) {
             this.dir = Util.unwrapDirectory(directory);
-            this.segmentTuple = dir.subspace.add(si.name).add(VECTORS_EXTENSION);
+            this.segmentTuple = dir.subspace.add(si.name).add(TERM_VECTORS_EXT);
         }
 
         private FDBTermVectorsReader(FDBDirectory dir, Tuple segmentTuple) {
@@ -80,7 +80,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
         @Override
         public Fields get(int doc) {
             List<TVField> fields = new ArrayList<TVField>();
-            for(KeyValue kv : dir.txn.getRange(segmentTuple.add(doc).add(FIELDS).range())) {
+            for(KeyValue kv : dir.txn.getRange(segmentTuple.add(doc).add(FIELD).range())) {
                 Tuple keyTuple = Tuple.fromBytes(kv.getKey());
                 Tuple valueTuple = Tuple.fromBytes(kv.getValue());
                 fields.add(
@@ -213,7 +213,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
 
             public TVTermsEnum(TVField field) {
                 this.field = field;
-                this.termsTuple = segmentTuple.add(field.doc).add(TERMS).add(field.name);
+                this.termsTuple = segmentTuple.add(field.doc).add(TERM).add(field.name);
             }
 
             private void advance() {
@@ -324,7 +324,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
 
         public FDBTermVectorsWriter(Directory directory, String segmentName) {
             this.dir = Util.unwrapDirectory(directory);
-            this.segmentTuple = dir.subspace.add(segmentName).add(VECTORS_EXTENSION);
+            this.segmentTuple = dir.subspace.add(segmentName).add(TERM_VECTORS_EXT);
         }
 
         @Override
@@ -337,7 +337,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
         public void startField(FieldInfo info, int numTerms, boolean hasPositions, boolean hasOffsets, boolean hasPayloads) {
             curField = info;
             dir.txn.set(
-                    docTuple.add(FIELDS).add(curField.name).pack(),
+                    docTuple.add(FIELD).add(curField.name).pack(),
                     Tuple.from(info.number, numTerms, hasPositions ? 1 : 0, hasOffsets ? 1 : 0, hasPayloads ? 1 : 0).pack()
             );
             // position number is part of the key, so we always have it
@@ -348,7 +348,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
 
         @Override
         public void startTerm(BytesRef term, int freq) {
-            termTuple = docTuple.add(TERMS).add(curField.name).add(Util.copyRange(term));
+            termTuple = docTuple.add(TERM).add(curField.name).add(Util.copyRange(term));
             dir.txn.set(termTuple.pack(), Tuple.from(freq).pack());
             ++numTermsWritten;
         }

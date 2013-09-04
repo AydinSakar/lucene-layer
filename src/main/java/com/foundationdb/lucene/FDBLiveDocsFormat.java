@@ -21,7 +21,7 @@ import java.util.Collection;
 //
 public class FDBLiveDocsFormat extends LiveDocsFormat
 {
-    private static final String LIVE_DOCS_EXTENSION = "liv";
+    private static final String LIVE_DOCS_EXT = "liv";
 
 
     @Override
@@ -73,7 +73,7 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
     public void files(SegmentInfoPerCommit info, Collection<String> files) throws IOException {
         // TODO: Needed?
         //if(info.hasDeletions()) {
-        //    files.add(IndexFileNames.fileNameFromGeneration(info.info.name, LIVE_DOCS_EXTENSION, info.getDelGen()));
+        //    files.add(IndexFileNames.fileNameFromGeneration(info.info.name, LIVE_DOCS_EXT, info.getDelGen()));
         //}`
     }
 
@@ -83,7 +83,7 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
     //
 
     private static Tuple makeLivTuple(FDBDirectory dir, SegmentInfoPerCommit info, long gen) {
-        return dir.subspace.add(info.info.name).add(LIVE_DOCS_EXTENSION).add(gen);
+        return dir.subspace.add(info.info.name).add(LIVE_DOCS_EXT).add(gen);
     }
 
     private static class FDBBits implements Bits, MutableBits
