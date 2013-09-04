@@ -1,7 +1,6 @@
 package com.foundationdb.lucene;
 
 import com.foundationdb.KeyValue;
-import com.foundationdb.Transaction;
 import com.foundationdb.tuple.Tuple;
 import org.apache.lucene.codecs.TermVectorsFormat;
 import org.apache.lucene.codecs.TermVectorsReader;

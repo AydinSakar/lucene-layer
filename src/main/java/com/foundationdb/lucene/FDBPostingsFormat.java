@@ -29,8 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import static com.foundationdb.lucene.Util.set;
-
 //
 // (dirTuple, segmentName, "pst", fieldNum, termBytes, "numDocs") => (atomic_op_num)
 // (dirTuple, segmentName, "pst", fieldNum, termBytes, docID0) => ([termDocFreq])

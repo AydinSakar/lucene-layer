@@ -20,7 +20,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-
 //
 // (dirTuple, segmentName, "fld", docID, 0, fieldNum) => ("typeName", dataIndex)    # "field type" key
 // ...

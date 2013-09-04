@@ -110,34 +110,45 @@ public class Util
     }
 
 
+    /** Get a boolean from the given tuple and index. */
     public static boolean getBool(Tuple tuple, int index) {
         return tuple.getLong(index) == 1;
     }
 
+    /** Add <code>keyPart</code> to the given tuple and set it to an empty value. */
     public static void set(Transaction txn, Tuple baseTuple, Object keyPart) {
         txn.set(baseTuple.addObject(keyPart).pack(), EMPTY_BYTES);
     }
 
+    /** Add <code>keyPart</code> to the given tuple and <code>set</code> it to a Tuple containing <code>value</code>. */
     public static void set(Transaction txn, Tuple baseTuple, Object keyPart, String value) {
         txn.set(baseTuple.addObject(keyPart).pack(), Tuple.from(value).pack());
     }
 
+    /** Add <code>keyPart</code> to the given tuple and <code>set</code> it to a Tuple containing <code>value</code>. */
     public static void set(Transaction txn, Tuple baseTuple, Object keyPart, boolean value) {
         txn.set(baseTuple.addObject(keyPart).pack(), Tuple.from(value ? 1 : 0).pack());
     }
 
+    /** Add <code>keyPart</code> to the given tuple and <code>set</code> it to a Tuple containing <code>value</code>. */
     public static void set(Transaction txn, Tuple baseTuple, Object keyPart, long value) {
         txn.set(baseTuple.addObject(keyPart).pack(), Tuple.from(value).pack());
     }
 
+    /** Add <code>keyPart</code> to the given tuple and <code>set</code> it to a Tuple containing <code>value</code>. */
     public static void set(Transaction txn, Tuple baseTuple, Object keyPart, BytesRef value) {
         txn.set(baseTuple.addObject(keyPart).pack(), Tuple.from().add(copyRange(value)).pack());
     }
 
+    /** Add <code>keyPart</code> to the given tuple and <code>set</code> it to <code>valueTuple</code>. */
     public static void set(Transaction txn, Tuple baseTuple, Object keyPart, Tuple valueTuple) {
         txn.set(baseTuple.addObject(keyPart).pack(), valueTuple.pack());
     }
 
+    /**
+     * For each <code>entry</code> in <code>map</code>, add <code>entry.getKey()</code> to <code>baseTuple</code> and
+     * <code>set</code> it to a Tuple containing <code>entry.getValue()</code>.
+     */
     public static void setMap(Transaction txn, Tuple baseTuple, Map<String, String> map) {
         if(map == null || map.isEmpty()) {
             return;
