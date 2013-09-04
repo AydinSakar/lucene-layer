@@ -49,25 +49,25 @@ below refer to the `DocValuesType` enum ordinal values.
 
 Subspace: `("dat")`
 
-- `(str_fieldName, long_BINARY, long_doc0)` => `(bytes_value)`
-- `(str_fieldName, long_BINARY, long_doc1)` => `(bytes_value)`
-- _..._
-- `(str_fieldName, long_NUMERIC, long_doc0)` => `(long_value)`
-- `(str_fieldName, long_NUMERIC, long_doc1)` => `(long_value)`
-- _..._
-- `(str_fieldName, long_SORTED, "bytes", long_ordinal0)` => `(bytes_value)`
-- `(str_fieldName, long_SORTED, "bytes", long_ordinal1)` => `(bytes_value)`
-- _..._
-- `(str_fieldName, long_SORTED_SET, "ord", long_doc0)` => `(long_ordinal)`
-- `(str_fieldName, long_SORTED_SET, "ord", long_doc1)` => `(long_ordinal)`
-- _..._
-- `(str_fieldName, long_SORTED_SET, "bytes", long_ordinal0)` => `(bytes_value)`
-- `(str_fieldName, long_SORTED_SET, "bytes", long_ordinal1)` => `(bytes_value)`
-- _..._
-- `(str_fieldName, long_SORTED_SET, "doc_ord", long_doc0, long_ordinal0)` => `()`
-- `(str_fieldName, long_SORTED_SET, "doc_ord", long_doc0, long_ordinal1)` => `()`
-- `(str_fieldName, long_SORTED_SET, "doc_ord", long_doc1, long_ordinal0)` => `()`
-- _..._
+    (str_fieldName, long_BINARY, long_doc0) => (bytes_value)
+    (str_fieldName, long_BINARY, long_doc1) => (bytes_value)
+    ...
+    (str_fieldName, long_NUMERIC, long_doc0) => (long_value)
+    (str_fieldName, long_NUMERIC, long_doc1) => (long_value)
+    ...
+    (str_fieldName, long_SORTED, "bytes", long_ordinal0) => (bytes_value)
+    (str_fieldName, long_SORTED, "bytes", long_ordinal1) => (bytes_value)
+    ...
+    (str_fieldName, long_SORTED_SET, "ord", long_doc0) => (long_ordinal)
+    (str_fieldName, long_SORTED_SET, "ord", long_doc1) => (long_ordinal)
+    ...
+    (str_fieldName, long_SORTED_SET, "bytes", long_ordinal0) => (bytes_value)
+    (str_fieldName, long_SORTED_SET, "bytes", long_ordinal1) => (bytes_value)
+    ...
+    (str_fieldName, long_SORTED_SET, "doc_ord", long_doc0, long_ordinal0) => ()
+    (str_fieldName, long_SORTED_SET, "doc_ord", long_doc0, long_ordinal1) => ()
+    (str_fieldName, long_SORTED_SET, "doc_ord", long_doc1, long_ordinal0) => ()
+    ...
 
 
 ### FieldInfosFormat
@@ -79,19 +79,19 @@ and
 
 Subspace: `("inf")`
 
-- `(long_field0, "name")` => `(string_fieldName)`
-- `(long_field0, "has_index")` => `(boolean_value)`
-- `(long_field0, "has_payloads")` => `(boolean_value)`
-- `(long_field0, "has_norms")` => `(boolean_value)`
-- `(long_field0, "has_vectors")` => `(boolean_value)`
-- `(long_field0, "doc_values_type")` => `(string_docValuesType)`
-- `(long_field0, "norms_type")` => `(string_normsType)`
-- `(long_field0, "index_options")` => `(string_indexOptions)`
-- `(long_field0, "attr", string_attr0)` => `(string_value)`
-- `(long_field0, "attr", string_attr1)` => `(string_value)`
-- _..._
-- `(long_field1, "name")` => `(string_fieldName)`
-- _..._
+    (long_field0, "name") => (string_fieldName)
+    (long_field0, "has_index") => (boolean_value)
+    (long_field0, "has_payloads") => (boolean_value)
+    (long_field0, "has_norms") => (boolean_value)
+    (long_field0, "has_vectors") => (boolean_value)
+    (long_field0, "doc_values_type") => (string_docValuesType)
+    (long_field0, "norms_type") => (string_normsType)
+    (long_field0, "index_options") => (string_indexOptions)
+    (long_field0, "attr", string_attr0) => (string_value)
+    (long_field0, "attr", string_attr1) => (string_value)
+    ...
+    (long_field1, "name") => (string_fieldName)
+    ...
 
 
 ### LiveDocsFormat
@@ -101,11 +101,11 @@ Encodes/decodes live-ness of documents. See
 
 Subspace: `("liv")`
 
-- `(long_liveGen0)` => `(long_totalSize)`
-- `(long_liveGen0, long_setBitIndex0)` => `()`
-- `(long_liveGen0, long_setBitIndex1)` => `()`
-- `(long_liveGen1)` => `(long_totalSize)`
-- _..._
+    (long_liveGen0) => (long_totalSize)
+    (long_liveGen0, long_setBitIndex0) => ()
+    (long_liveGen0, long_setBitIndex1) => ()
+    (long_liveGen1) => (long_totalSize)
+    ...
 
 
 ### NormsFormat
@@ -125,12 +125,12 @@ Encodes/decodes terms, postings, and proximity data. See
 
 Subspace: `("pst")`
 
-- `(long_field0, bytes_term0, "numDocs")` => `(littleEndianLong_value)`
-- `(long_field0, bytes_term0, long_doc0)` => `(long_termDocFreq)`
-- `(long_field0, bytes_term0, long_doc0, long_pos0)` => `(long_startOffset, long_endOffset, bytes_payload)`
-- _..._
-- `(long_field1, bytes_term1, "numDocs")` => `(littleEndianLong_value)`
-- _..._
+    (long_field0, bytes_term0, "numDocs") => (littleEndianLong_value)
+    (long_field0, bytes_term0, long_doc0) => (long_termDocFreq)
+    (long_field0, bytes_term0, long_doc0, long_pos0) => (long_startOffset, long_endOffset, bytes_payload)
+    ...
+    (long_field1, bytes_term1, "numDocs") => (littleEndianLong_value)
+    ...
 
 
 ### SegmentInfoFormat
@@ -140,18 +140,18 @@ Encodes/decodes segment metadata. See
 
 Subspace: `("si")`
 
-- `("doc_count")`=> `(long_docCount)`
-- `("is_compound_file")` => `(boolean_value)`
-- `("version")` => `(long_version)`
-- `("attr", string_attr0)` => `(string_value)`
-- `("attr", string_attr1)` => `(string_value)`
-- _..._
-- `("diag", string_diag0)` => `(string_value)`
-- `("diag", string_diag1)` => `(string_value)`
-- _..._
-- `("file", string_file0)` => `()`
-- `("file", string_file1)` => `()`
-- _..._
+    ("doc_count")=> (long_docCount)
+    ("is_compound_file") => (boolean_value)
+    ("version") => (long_version)
+    ("attr", string_attr0) => (string_value)
+    ("attr", string_attr1) => (string_value)
+    ...
+    ("diag", string_diag0) => (string_value)
+    ("diag", string_diag1) => (string_value)
+    ...
+    ("file", string_file0) => ()
+    ("file", string_file1) => ()
+    ...
 
 
 ### StoredFieldsFormat
@@ -163,15 +163,15 @@ The key parts `long_TYPE` and `long_DATA` below refer to constants in the code, 
 
 Subspace: `("fld")`
 
-- `(long_doc0, long_TYPE, long_field0)` => `(string_typeName, long_dataIndex)`
-- `(long_doc0, long_TYPE, long_field1)` => `(string_typeName, long_dataIndex)`
-- _..._
-- `(long_doc0, long_DATA, long_field0, long_dataIndex, long_offset0)` => `(bytes_value)`
-- `(long_doc0, long_DATA, long_field0, long_dataIndex, long_offset1)` => `(bytes_value)`
-- `(long_doc0, long_DATA, long_field1, long_dataIndex, long_offset0)` => `(bytes_value)`
-- _..._
-- `(long_doc1, long_TYPE, long_field0)` => `(string_typeName, long_dataIndex)`
-- _..._
+    (long_doc0, long_TYPE, long_field0) => (string_typeName, long_dataIndex)
+    (long_doc0, long_TYPE, long_field1) => (string_typeName, long_dataIndex)
+    ...
+    (long_doc0, long_DATA, long_field0, long_dataIndex, long_offset0) => (bytes_value)
+    (long_doc0, long_DATA, long_field0, long_dataIndex, long_offset1) => (bytes_value)
+    (long_doc0, long_DATA, long_field1, long_dataIndex, long_offset0) => (bytes_value)
+    ...
+    (long_doc1, long_TYPE, long_field0) => (string_typeName, long_dataIndex)
+    ...
 
 
 ### TermVectorsFormat
@@ -181,16 +181,16 @@ Encodes/decodes per-document term vectors. See
 
 Subspace: `("vec")`
 
-- `(long_doc0, "field", string_field0)` => `(long_fieldNum, long_numTerms, boolean_hasPositions, boolean_hasOffsets, boolean_hasPayloads)`
-- `(long_doc0, "field", string_field1)` => `(long_fieldNum, long_numTerms, boolean_hasPositions, boolean_hasOffsets, boolean_hasPayloads)`
-- _..._
-- `(long_doc0, "term", string_field0, bytes_term0)` => `(long_freq)`
-- `(long_doc0, "term", string_field0, bytes_term0, long_pos0)` => `(long_startOffset, long_endOffset, bytes_payload)`
-- `(long_doc0, "term", string_field0, bytes_term0, long_pos1)` => `(long_startOffset, long_endOffset, bytes_payload)`
-- `(long_doc0, "term", string_field0, bytes_term1)` => `(long_freq)`
-- _..._
-- `(long_doc1, "field", string_fieldName0)` => `(long_fieldNum, long_numTerms, boolean_hasPositions, boolean_hasOffsets, boolean_hasPayloads)`
-- _..._
+    (long_doc0, "field", string_field0) => (long_fieldNum, long_numTerms, boolean_hasPositions, boolean_hasOffsets, boolean_hasPayloads)
+    (long_doc0, "field", string_field1) => (long_fieldNum, long_numTerms, boolean_hasPositions, boolean_hasOffsets, boolean_hasPayloads)
+    ...
+    (long_doc0, "term", string_field0, bytes_term0) => (long_freq)
+    (long_doc0, "term", string_field0, bytes_term0, long_pos0) => (long_startOffset, long_endOffset, bytes_payload)
+    (long_doc0, "term", string_field0, bytes_term0, long_pos1) => (long_startOffset, long_endOffset, bytes_payload)
+    (long_doc0, "term", string_field0, bytes_term1) => (long_freq)
+    ...
+    (long_doc1, "field", string_fieldName0) => (long_fieldNum, long_numTerms, boolean_hasPositions, boolean_hasOffsets, boolean_hasPayloads)
+    ...
 
 
 ## Running Built-In Tests
