@@ -14,6 +14,18 @@ new serialization and data models for Lucene. This results in explicit keys and
 values in the database instead of file-like blobs.
 
 
+## _Warning: Alpha Stage_
+
+This layer is at an early alpha stage (note the 0.0.1 version number). While
+most of the stock Lucene tests pass when using `FDBDirectory`, many currently
+fail when running with `FDBCodec`. There are no known _correctness_ issues at
+this time but slowness and timeout issues could easily be hiding such problems.
+
+Please try it out and let us know how it works (e.g. on our
+[community site](http://community.foundationdb.com/)), but production usage
+is *not* recommended at this time.
+
+
 ## FDBCodec Data Model
 
 The [Subspace](https://foundationdb.com/documentation/data-modeling.html#subspaces-of-keys)
@@ -198,7 +210,7 @@ Subspace: `("vec")`
 [Maven](http://maven.apache.org/) is used for building, packaging and running
 tests.
 
-`$ mvn test`
+    $ mvn test
 
 
 ## Running Lucene and Solr Tests
@@ -219,3 +231,4 @@ tests.
                    -Dtests.directory=com.foundationdb.lucene.FDBTestDirectory \
                    -lib  ../target/fdb-lucene-layer-0.0.1-SNAPSHOT.jar \
                    -lib ../target/dependency/fdb-java-1.0.0.jar
+
