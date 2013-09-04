@@ -8,6 +8,20 @@
     <packaging>jar</packaging>
 
     <name>FoundationDB Lucene Layer</name>
+    <inceptionYear>2013</inceptionYear>
+    <url>https://foundationdb.com/</url>
+    <organization>
+        <name>FoundationDB, LLC</name>
+        <url>https://foundationdb.com</url>
+    </organization>
+
+    <licenses>
+        <license>
+            <name>The MIT License</name>
+            <url>http://opensource.org/licenses/MIT</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
