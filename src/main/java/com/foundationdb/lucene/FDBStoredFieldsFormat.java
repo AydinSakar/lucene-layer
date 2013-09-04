@@ -20,13 +20,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-//
-// (dirTuple, segmentName, "fld", docID, 0, fieldNum) => ("typeName", dataIndex)    # "field type" key
-// ...
-// (dirTuple, segmentName, "fld", docID, 1, fieldNum, dataIndex, off0) => (data0)   # "field data" key, part 0
-// (dirTuple, segmentName, "fld", docID, 1, fieldNum, dataIndex, off1) => (data1)   # "field data" key, part 1
-// ..
-//
 public class FDBStoredFieldsFormat extends StoredFieldsFormat
 {
     private final static String STORED_FIELDS_EXT = "fld";
@@ -44,7 +37,6 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
                     TYPE_INT, TYPE_LONG, TYPE_FLOAT, TYPE_DOUBLE, TYPE_BINARY, TYPE_STRING
             )
     );
-
 
     private final static int LARGE_VALUE_BLOCK_SIZE = 10000;
 

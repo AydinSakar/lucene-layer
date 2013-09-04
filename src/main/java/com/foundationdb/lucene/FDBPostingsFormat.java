@@ -29,11 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-//
-// (dirTuple, segmentName, "pst", fieldNum, termBytes, "numDocs") => (atomic_op_num)
-// (dirTuple, segmentName, "pst", fieldNum, termBytes, docID0) => ([termDocFreq])
-// (dirTuple, segmentName, "pst", fieldNum, termBytes, docID0, posNum) => ([startOffset, endOffset, payload])
-//
 public final class FDBPostingsFormat extends PostingsFormat
 {
     private static final String POSTINGS_EXT = "pst";

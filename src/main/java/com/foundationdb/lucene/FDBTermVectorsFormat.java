@@ -27,16 +27,6 @@ import java.util.List;
 import static com.foundationdb.lucene.Util.getBool;
 import static com.foundationdb.lucene.Util.set;
 
-//
-// (segmentName, "vec", docNum, "field", fieldName0) => (fieldNum, numTerms, hasPositions, hasOffsets, hasPayloads)
-// (segmentName, "vec", docNum, "field", fieldName1) => (fieldNum, numTerms, hasPositions, hasOffsets, hasPayloads)
-// ...
-// (segmentName, "vec", docNum, "term", fieldName, termBytes0) => (freq)
-// (segmentName, "vec", docNum, "term", fieldName, termBytes0, posNum0) => (start_offset, end_offset, payload)
-// (segmentName, "vec", docNum, "term", fieldName, termBytes0, posNum1) => (start_offset, end_offset, payload)
-// (segmentName, "vec", docNum, "term", fieldName, termBytes1) => (freq)
-// ...
-//
 public class FDBTermVectorsFormat extends TermVectorsFormat
 {
     private static final String TERM_VECTORS_EXT = "vec";

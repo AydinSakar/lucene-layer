@@ -8,9 +8,6 @@ import org.apache.lucene.index.SegmentWriteState;
 
 import java.io.IOException;
 
-//
-// Just like FDBDocValuesFormat, but extension is "len" instead of "dat"
-//
 public class FDBNormsFormat extends NormsFormat
 {
     private static final String NORMS_EXT = "len";

@@ -21,17 +21,6 @@ import static com.foundationdb.lucene.Util.getBool;
 import static com.foundationdb.lucene.Util.set;
 import static com.foundationdb.lucene.Util.setMap;
 
-//
-// (docSubspace, segmentName, "si", "doc_count") => (docCountNum)
-// (docSubspace, segmentName, "si", "is_compound_file") => ([0|1])
-// (docSubspace, segmentName, "si", "version") => (versionNum)
-// (docSubspace, segmentName, "si", "diag", "attrKey0") => ("attrValue0")
-// ...
-// (docSubspace, segmentName, "si", "diag", "diagKey0") => ("diagValue0")
-// ...
-// (docSubspace, segmentName, "si", "file", "fileKey0") => ("fileValue0")
-// ...
-//
 public class FDBSegmentInfoFormat extends SegmentInfoFormat
 {
     private static final String SEGMENT_INFO_EXT = "si";

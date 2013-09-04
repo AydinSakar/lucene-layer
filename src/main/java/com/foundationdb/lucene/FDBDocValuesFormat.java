@@ -21,24 +21,6 @@ import java.util.List;
 
 import static com.foundationdb.lucene.Util.set;
 
-//
-// type=numeric:
-// (dirTuple, segName, segSuffix, ext, fieldName, NUMERIC, docID) => (value0)
-//
-// type=sorted:
-// (dirTuple, segName, segSuffix, ext, fieldName, SORTED, "bytes", ordNum) => (bytes)
-// ...
-// (dirTuple, segName, segSuffix, ext, fieldName, SORTED, "ord", docID) => (ordNum)
-// ...
-//
-// type=sortedSet:
-// (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "bytes", ordNum) => (bytes)
-// ...
-// (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "doc_ord", docID0, ordNum0) => []
-// (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "doc_ord", docID0, ordNum1) => []
-// (dirTuple, segName, segSuffix, ext, fieldName, SORTED_SET, "doc_ord", docID1, ordNum0) => []
-// ...
-//
 public class FDBDocValuesFormat extends DocValuesFormat
 {
     private static final String DOC_VALUES_EXT = "dat";

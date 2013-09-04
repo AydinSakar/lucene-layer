@@ -20,19 +20,6 @@ import java.util.Map;
 import static com.foundationdb.lucene.Util.getBool;
 import static com.foundationdb.lucene.Util.set;
 
-//
-// (dirSubspace, segmentName, "inf", fieldNum, "name") = (fieldName)
-// (dirSubspace, segmentName, "inf", fieldNum, "has_index") = ([0|1])
-// (dirSubspace, segmentName, "inf", fieldNum, "has_payloads") = ([0|1])
-// (dirSubspace, segmentName, "inf", fieldNum, "has_norms") = ([0|1])
-// (dirSubspace, segmentName, "inf", fieldNum, "has_vectors") = ([0|1])
-// (dirSubspace, segmentName, "inf", fieldNum, "doc_values_type") = ("docValuesType")
-// (dirSubspace, segmentName, "inf", fieldNum, "norms_type") = ("normsType")
-// (dirSubspace, segmentName, "inf", fieldNum, "index_options") = ("indexOptions")
-// (dirSubspace, segmentName, "inf", fieldNum, "attr", "attrKey0") = ("attrValue0")
-// (dirSubspace, segmentName, "inf", fieldNum, "attr", "attrKey1") = ("attrValue1")
-// ...
-//
 public class FDBFieldInfosFormat extends FieldInfosFormat
 {
     private static final String FIELD_INFOS_EXT = "inf";

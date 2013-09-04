@@ -15,12 +15,6 @@ import java.util.Collection;
 
 import static com.foundationdb.lucene.Util.set;
 
-//
-// (livTuple) => (totalSize)
-// (livTuple, setBitIndex0) => []
-// (livTuple, setBitIndex1) => []
-// ...
-//
 public class FDBLiveDocsFormat extends LiveDocsFormat
 {
     private static final String LIVE_DOCS_EXT = "liv";
