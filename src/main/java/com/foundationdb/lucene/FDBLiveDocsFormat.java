@@ -39,12 +39,10 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
 
     @Override
     public Bits readLiveDocs(Directory directory, SegmentInfoPerCommit info, IOContext context) {
-        neverCalled();
-
-        assert info.hasDeletions() : "Has no deletions";
+        assert info.hasDeletions() : "No deletions: " + info.info.name;
 
         FDBDirectory dir = Util.unwrapDirectory(directory);
-        Tuple livTuple = makeLivTuple(dir, info);
+        Tuple livTuple = makeLivTuple(dir, info, info.getDelGen());
 
         byte[] sizeBytes = dir.txn.get(livTuple.pack()).get();
         assert sizeBytes != null : "No such livTuple";
@@ -60,10 +58,8 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
 
     @Override
     public void writeLiveDocs(MutableBits liveDocs, Directory directory, SegmentInfoPerCommit info, int newDelCount, IOContext context) {
-        neverCalled();
-
         FDBDirectory dir = Util.unwrapDirectory(directory);
-        Tuple livTuple = makeLivTuple(dir, info);
+        Tuple livTuple = makeLivTuple(dir, info, info.getNextDelGen());
 
         FDBBits bits = (FDBBits)liveDocs;
         dir.txn.set(livTuple.pack(), Tuple.from(bits.size).pack());
@@ -86,13 +82,8 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
     // Helpers
     //
 
-    private static Tuple makeLivTuple(FDBDirectory dir, SegmentInfoPerCommit info) {
-        return dir.subspace.add(info.info.name).add(LIVE_DOCS_EXTENSION).add(info.getNextDelGen());
-    }
-
-    // Until a test is found that exercises this;
-    private static void neverCalled() {
-        throw new IllegalStateException("Never called");
+    private static Tuple makeLivTuple(FDBDirectory dir, SegmentInfoPerCommit info, long gen) {
+        return dir.subspace.add(info.info.name).add(LIVE_DOCS_EXTENSION).add(gen);
     }
 
     private static class FDBBits implements Bits, MutableBits
