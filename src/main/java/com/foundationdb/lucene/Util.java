@@ -22,9 +22,7 @@ public class Util
 {
     public static final int DEFAULT_API_VERSION = 100;
     public static final String DEFAULT_ROOT_PREFIX = "lucene";
-
     public static final String DEFAULT_TEST_ROOT_PREFIX = "test_" + DEFAULT_ROOT_PREFIX;
-    public static final String TEST_MODE_PROPERTY = "FDBCodec.test_mode";
 
 
     public static FDBDirectory unwrapDirectory(Directory dir) {
@@ -42,11 +40,9 @@ public class Util
         } catch(IOException e) {
             cause = e;
         }
-        if(test_ON) {
-            FDBTestDirectory threadDir = test_GetDirectory();
-            if(threadDir != null) {
-                return threadDir.getSubDir().getFDBDirectory();
-            }
+        FDBTestDirectory threadDir = test_GetDirectory();
+        if(threadDir != null) {
+            return threadDir.getSubDir().getFDBDirectory();
         }
         throw new IllegalStateException("No FDBDirectory to unwrap", cause);
     }
@@ -143,19 +139,13 @@ public class Util
     // Solr test suites. These are hidden behind an opt-in config and prefixed with test_ to indicate as much.
     //
 
-    private static final boolean test_ON;
-    private static final FDB test_FDB;
-    private static final Database test_DB;
-    private static final ThreadLocal<FDBTestDirectory> test_DIR;
+    private static FDB test_FDB = null;
+    private static Database test_DB = null;
+    private static ThreadLocal<FDBTestDirectory> test_DIR = null;
 
-    static {
-        test_ON = Boolean.parseBoolean(System.getProperty(TEST_MODE_PROPERTY));
-        if(!test_ON) {
-            test_FDB = null;
-            test_DB = null;
-            test_DIR = null;
-        } else {
-            test_FDB = FDB.selectAPIVersion(100);
+    private static synchronized void initFDB() {
+        if(test_FDB == null) {
+            test_FDB = FDB.selectAPIVersion(DEFAULT_API_VERSION);
 
             // Find system thread group to avoid zombie assertions
             final ThreadGroup threadGroup = findSystemThreadGroup();
@@ -180,10 +170,10 @@ public class Util
         }
     }
 
-    private static void test_CheckMode() {
-        if(!test_ON) {
+    private static void test_CheckInitialized() {
+        if(test_FDB == null) {
             String name = Util.class.getCanonicalName();
-            System.err.println("ERROR: " + name + ": " + TEST_MODE_PROPERTY + " property is false");
+            System.err.println("ERROR: " + name + ": FDB not yet initialized");
             System.err.flush();
         }
     }
@@ -198,7 +188,6 @@ public class Util
     }
 
     private static FDBTestDirectory test_GetDirectory() {
-        test_CheckMode();
         if(test_DIR != null) {
             return test_DIR.get();
         }
@@ -206,17 +195,17 @@ public class Util
     }
 
     static Transaction test_CreateTransaction() {
-        test_CheckMode();
+        initFDB();
         return test_DB.createTransaction();
     }
 
     static void test_SetDirectory(FDBTestDirectory testDir) {
-        test_CheckMode();
+        test_CheckInitialized();
         test_DIR.set(testDir);
     }
 
     static void test_ClearDirectory(FDBTestDirectory testDir) {
-        test_CheckMode();
+        test_CheckInitialized();
         if(test_DIR.get() == testDir) {
             test_DIR.set(null);
         }

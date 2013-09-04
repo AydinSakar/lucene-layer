@@ -22,7 +22,6 @@ public class FDBTestDirectory extends FSDirectory
     private boolean closed;
 
 
-    @SuppressWarnings("UnusedDeclaration") // Invoked dynamically via tests
     public FDBTestDirectory(File path) throws IOException {
         this(path, Util.test_CreateTransaction());
         // Note: Not ideal, as 'this' escapes, but fully constructed at this point
