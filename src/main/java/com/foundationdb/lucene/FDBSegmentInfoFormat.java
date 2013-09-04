@@ -18,15 +18,27 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+
+//
+// (docSubspace, segmentName, "si", "doc_count") => (docCountNum)
+// (docSubspace, segmentName, "si", "is_compound_file") => ([0|1])
+// (docSubspace, segmentName, "si", "version") => (versionNum)
+// (docSubspace, segmentName, "si", "diag", "attrKey0") => ("attrValue0")
+// ...
+// (docSubspace, segmentName, "si", "diag", "diagKey0") => ("diagValue0")
+// ...
+// (docSubspace, segmentName, "si", "file", "fileKey0") => ("fileValue0")
+// ...
+//
 public class FDBSegmentInfoFormat extends SegmentInfoFormat
 {
-    private static final String SI_EXTENSION = "si";
-    private static final String VERSION = "version";
+    private static final String SEGMENT_INFO_EXT = "si";
     private static final String DOC_COUNT = "doc_count";
-    private static final String COMPOUND_FILE = "compound_file";
-    private static final String DIAGNOSTICS = "diagnostics";
-    private static final String ATTRIBUTES = "attributes ";
-    private static final String FILES = "files";
+    private static final String VERSION = "version";
+    private static final String IS_COMPOUND_FILE = "is_compound_file";
+    private static final String DIAG = "diag";
+    private static final String ATTR = "attr";
+    private static final String FILE = "file";
 
 
     //
@@ -52,9 +64,8 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
     {
         @Override
         public SegmentInfo read(Directory dirIn, String segmentName, IOContext context) throws IOException {
-            FDBDirectory dir = Util.unwrapDirectory(dirIn);
-            Transaction txn = dir.txn;
-            Tuple segmentTuple = dir.subspace.add(segmentName).add(SI_EXTENSION);
+            final FDBDirectory dir = Util.unwrapDirectory(dirIn);
+            final Tuple segmentTuple = dir.subspace.add(segmentName).add(SEGMENT_INFO_EXT);
 
             String version = null;
             Integer docCount = null;
@@ -63,7 +74,7 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
             Map<String, String> attributes = new HashMap<String, String>();
             Set<String> files = new HashSet<String>();
 
-            for(KeyValue kv : txn.getRange(segmentTuple.range())) {
+            for(KeyValue kv : dir.txn.getRange(segmentTuple.range())) {
                 Tuple keyTuple = Tuple.fromBytes(kv.getKey());
                 Tuple valueTuple = Tuple.fromBytes(kv.getValue());
                 String key = keyTuple.getString(segmentTuple.size());
@@ -73,17 +84,17 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
                         version = valueTuple.getString(0);
                     } else if(DOC_COUNT.equals(key)) {
                         docCount = (int)valueTuple.getLong(0);
-                    } else if(COMPOUND_FILE.equals(key)) {
+                    } else if(IS_COMPOUND_FILE.equals(key)) {
                         isCompoundFile = valueTuple.getLong(0) == 1;
                     } else {
                         found = false;
                     }
                 } else if(keyTuple.size() == (segmentTuple.size() + 2)) {
-                    if(DIAGNOSTICS.equals(key)) {
+                    if(DIAG.equals(key)) {
                         diagnostics.put(keyTuple.getString(segmentTuple.size() + 1), valueTuple.getString(0));
-                    } else if(ATTRIBUTES.equals(key)) {
+                    } else if(ATTR.equals(key)) {
                         attributes.put(keyTuple.getString(segmentTuple.size() + 1), valueTuple.getString(0));
-                    } else if(FILES.equals(key)) {
+                    } else if(FILE.equals(key)) {
                         files.add(keyTuple.getString(segmentTuple.size() + 1));
                     } else {
                         found = false;
@@ -96,9 +107,15 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
                 }
             }
 
-            required(segmentName, VERSION, version);
-            required(segmentName, DOC_COUNT, docCount);
-            required(segmentName, COMPOUND_FILE, isCompoundFile);
+            if(version == null) {
+                throw required(segmentName, VERSION);
+            }
+            if(docCount == null) {
+                throw required(segmentName, DOC_COUNT);
+            }
+            if(isCompoundFile == null) {
+                throw required(segmentName, IS_COMPOUND_FILE);
+            }
 
             SegmentInfo info = new SegmentInfo(
                     dirIn,
@@ -115,10 +132,8 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
             return info;
         }
 
-        private static void required(String segmentName, String keyName, Object value) {
-            if(value == null) {
-                throw new IllegalStateException("Segment " + segmentName + " missing key: " + keyName);
-            }
+        private static IllegalStateException required(String segmentName, String keyName) {
+            return new IllegalStateException("Segment " + segmentName + " missing key: " + keyName);
         }
     }
 
@@ -130,23 +145,21 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
     {
         @Override
         public void write(Directory dirIn, SegmentInfo si, FieldInfos fis, IOContext ioContext) throws IOException {
-            FDBDirectory dir = Util.unwrapDirectory(dirIn);
-            Transaction txn = dir.txn;
+            final FDBDirectory dir = Util.unwrapDirectory(dirIn);
+            final Tuple segmentTuple = dir.subspace.add(si.name).add(SEGMENT_INFO_EXT);
 
-            Tuple segmentTuple = dir.subspace.add(si.name).add(SI_EXTENSION);
+            set(dir.txn, segmentTuple, DOC_COUNT, si.getDocCount());
+            set(dir.txn, segmentTuple, IS_COMPOUND_FILE, si.getUseCompoundFile() ? 1 : 0);
+            set(dir.txn, segmentTuple, VERSION, si.getVersion());
 
-            set(txn, segmentTuple, VERSION, si.getVersion());
-            set(txn, segmentTuple, DOC_COUNT, si.getDocCount());
-            set(txn, segmentTuple, COMPOUND_FILE, si.getUseCompoundFile() ? 1 : 0);
-
-            writeMap(txn, segmentTuple.add(DIAGNOSTICS), si.getDiagnostics());
-            writeMap(txn, segmentTuple.add(ATTRIBUTES), si.attributes());
+            writeMap(dir.txn, segmentTuple.add(DIAG), si.getDiagnostics());
+            writeMap(dir.txn, segmentTuple.add(ATTR), si.attributes());
 
             Set<String> files = si.files();
             if(files != null && !files.isEmpty()) {
-                Tuple fileTuple = segmentTuple.add(FILES);
+                Tuple fileTuple = segmentTuple.add(FILE);
                 for(String fileName : files) {
-                    set(txn, fileTuple, fileName, null);
+                    set(dir.txn, fileTuple, fileName, null);
                 }
             }
         }
@@ -158,11 +171,10 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
     //
 
     private static void set(Transaction txn, Tuple baseTuple, String key, Object value) {
-        Tuple valueTuple = (value != null) ? Tuple.from(value) : Tuple.from();
-        txn.set(baseTuple.add(key).pack(), valueTuple.pack());
+        txn.set(baseTuple.add(key).pack(), Tuple.from(value).pack());
     }
 
-    private static void writeMap(Transaction txn, Tuple baseTuple, Map<String,String> map) {
+    private static void writeMap(Transaction txn, Tuple baseTuple, Map<String, String> map) {
         if(map == null || map.isEmpty()) {
             return;
         }
