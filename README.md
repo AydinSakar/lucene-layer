@@ -44,31 +44,30 @@ Encodes/decodes strongly typed, per document values. See
 and
 [FieldInfo.DocValuesType](https://lucene.apache.org/core/4_4_0/core/org/apache/lucene/index/FieldInfo.DocValuesType.html):
 
+The `long_BINARY`, `long_NUMERIC`, `long_SORTED` and `long_SORTED_SET` key parts
+below refer to the `DocValuesType` enum ordinal values.
+
 Subspace: `("dat")`
 
-- `DocValuesType.BINARY`
-    - `(str_fieldName, long_numericOrdinal, long_docID0)` => `(bytes_value)`
-    - `(str_fieldName, long_numericOrdinal, long_docID1)` => `(bytes_value)`
-    - _..._
-- `DocValuesType.NUMERIC`
-    - `(str_fieldName, long_numericOrdinal, long_docID0)` => `(long_value)`
-    - `(str_fieldName, long_numericOrdinal, long_docID1)` => `(long_value)`
-    - _..._
-- `DocValuesType.SORTED`
-    - `(str_fieldName, long_sortedOrdinal, "bytes", long_ordinal0)` => `(bytes_value)`
-    - `(str_fieldName, long_sortedOrdinal, "bytes", long_ordinal1)` => `(bytes_value)`
-    - _..._
-    - `(str_fieldName, long_sortedOrdinal, "ord", long_docID0)` => `(long_ordinal)`
-    - `(str_fieldName, long_sortedOrdinal, "ord", long_docID1)` => `(long_ordinal)`
-    - _..._
-- `DocValuesType.SORTED_SET`
-    - `(str_fieldName, long_sortedSetOrdinal, "bytes", long_ordinal0)` => `(bytes_bytes)`
-    - `(str_fieldName, long_sortedSetOrdinal, "bytes", long_ordinal1)` => `(bytes_bytes)`
-    - _..._
-    - `(str_fieldName, long_sortedSetOrdinal, "doc_ord", long_docID0, long_ordinal0)` => `()`
-    - `(str_fieldName, long_sortedSetOrdinal, "doc_ord", long_docID0, long_ordinal1)` => `()`
-    - `(str_fieldName, long_sortedSetOrdinal, "doc_ord", long_docID1, long_ordinal0)` => `()`
-    - _..._
+- `(str_fieldName, long_BINARY, long_doc0)` => `(bytes_value)`
+- `(str_fieldName, long_BINARY, long_doc1)` => `(bytes_value)`
+- _..._
+- `(str_fieldName, long_NUMERIC, long_doc0)` => `(long_value)`
+- `(str_fieldName, long_NUMERIC, long_doc1)` => `(long_value)`
+- _..._
+- `(str_fieldName, long_SORTED, "bytes", long_ordinal0)` => `(bytes_value)`
+- `(str_fieldName, long_SORTED, "bytes", long_ordinal1)` => `(bytes_value)`
+- _..._
+- `(str_fieldName, long_SORTED_SET, "ord", long_doc0)` => `(long_ordinal)`
+- `(str_fieldName, long_SORTED_SET, "ord", long_doc1)` => `(long_ordinal)`
+- _..._
+- `(str_fieldName, long_SORTED_SET, "bytes", long_ordinal0)` => `(bytes_value)`
+- `(str_fieldName, long_SORTED_SET, "bytes", long_ordinal1)` => `(bytes_value)`
+- _..._
+- `(str_fieldName, long_SORTED_SET, "doc_ord", long_doc0, long_ordinal0)` => `()`
+- `(str_fieldName, long_SORTED_SET, "doc_ord", long_doc0, long_ordinal1)` => `()`
+- `(str_fieldName, long_SORTED_SET, "doc_ord", long_doc1, long_ordinal0)` => `()`
+- _..._
 
 
 ### FieldInfosFormat
@@ -80,18 +79,18 @@ and
 
 Subspace: `("inf")`
 
-- `(long_fieldNum0, "name")` => `(string_fieldName)`
-- `(long_fieldNum0, "has_index")` => `(boolean_value)`
-- `(long_fieldNum0, "has_payloads")` => `(boolean_value)`
-- `(long_fieldNum0, "has_norms")` => `(boolean_value)`
-- `(long_fieldNum0, "has_vectors")` => `(boolean_value)`
-- `(long_fieldNum0, "doc_values_type")` => `(string_docValuesType)`
-- `(long_fieldNum0, "norms_type")` => `(string_normsType)`
-- `(long_fieldNum0, "index_options")` => `(string_indexOptions)`
-- `(long_fieldNum0, "attr", "attrKey0")` => `(string_attrValue0)`
-- `(long_fieldNum0, "attr", "attrKey1")` => `(string_attrValue1)`
+- `(long_field0, "name")` => `(string_fieldName)`
+- `(long_field0, "has_index")` => `(boolean_value)`
+- `(long_field0, "has_payloads")` => `(boolean_value)`
+- `(long_field0, "has_norms")` => `(boolean_value)`
+- `(long_field0, "has_vectors")` => `(boolean_value)`
+- `(long_field0, "doc_values_type")` => `(string_docValuesType)`
+- `(long_field0, "norms_type")` => `(string_normsType)`
+- `(long_field0, "index_options")` => `(string_indexOptions)`
+- `(long_field0, "attr", string_attr0)` => `(string_value)`
+- `(long_field0, "attr", string_attr1)` => `(string_value)`
 - _..._
-- `(long_fieldNum1, "name")` => `(string_fieldName)`
+- `(long_field1, "name")` => `(string_fieldName)`
 - _..._
 
 
@@ -102,10 +101,10 @@ Encodes/decodes live-ness of documents. See
 
 Subspace: `("liv")`
 
-- `(long_liveGeneration0)` => `(long_totalSize)`
-- `(long_liveGeneration0, long_setBitIndex0)` => `()`
-- `(long_liveGeneration0, long_setBitIndex0)` => `()`
-- `(long_liveGeneration1)` => `(long_totalSize)`
+- `(long_liveGen0)` => `(long_totalSize)`
+- `(long_liveGen0, long_setBitIndex0)` => `()`
+- `(long_liveGen0, long_setBitIndex1)` => `()`
+- `(long_liveGen1)` => `(long_totalSize)`
 - _..._
 
 
@@ -116,7 +115,7 @@ Encodes/decodes per-document score normalization values. See
 
 Subspace: `("len")`
 
-_See `DocValuesFormat`. Different subspace extension, otherwise the same.
+_See `DocValuesFormat`. Different subspace extension, otherwise the same._
 
 
 ### PostingsFormat
@@ -126,11 +125,11 @@ Encodes/decodes terms, postings, and proximity data. See
 
 Subspace: `("pst")`
 
-- `(long_fieldNum, bytes_term0, "numDocs")` => `(littleEndianLong_value)`
-- `(long_fieldNum, bytes_term0, long_doc0)` => `(long_termDocFreq)`
-- `(long_fieldNum, bytes_term0, long_doc0, long_pos0)` => `(long_startOffset, long_endOffset, bytes_payload)`
+- `(long_field0, bytes_term0, "numDocs")` => `(littleEndianLong_value)`
+- `(long_field0, bytes_term0, long_doc0)` => `(long_termDocFreq)`
+- `(long_field0, bytes_term0, long_doc0, long_pos0)` => `(long_startOffset, long_endOffset, bytes_payload)`
 - _..._
-- `(long_fieldNum, bytes_term1, "numDocs")` => `(littleEndianLong_value)`
+- `(long_field1, bytes_term1, "numDocs")` => `(littleEndianLong_value)`
 - _..._
 
 
@@ -164,14 +163,15 @@ The key parts `long_TYPE` and `long_DATA` below refer to constants in the code, 
 
 Subspace: `("fld")`
 
-- `(long_docID0, long_TYPE, fieldNum0)` => `(string_typeName, long_dataIndex)`
-- `(long_docID0, long_TYPE, fieldNum1)` => `(string_typeName, long_dataIndex)`
+- `(long_doc0, long_TYPE, long_field0)` => `(string_typeName, long_dataIndex)`
+- `(long_doc0, long_TYPE, long_field1)` => `(string_typeName, long_dataIndex)`
 - _..._
-- `(long_docID0, long_DATA, fieldNum0, long_dataIndex, long_offset0)` => `(bytes_value)`
-- `(long_docID0, long_DATA, fieldNum0, long_dataIndex, long_offset1)` => `(bytes_value)`
-- `(long_docID0, long_DATA, fieldNum1, long_dataIndex, long_offset0)` => `(bytes_value)`
+- `(long_doc0, long_DATA, long_field0, long_dataIndex, long_offset0)` => `(bytes_value)`
+- `(long_doc0, long_DATA, long_field0, long_dataIndex, long_offset1)` => `(bytes_value)`
+- `(long_doc0, long_DATA, long_field1, long_dataIndex, long_offset0)` => `(bytes_value)`
 - _..._
-- `(long_docID1, long_TYPE, fieldNum0)` => `(string_typeName, long_dataIndex)`
+- `(long_doc1, long_TYPE, long_field0)` => `(string_typeName, long_dataIndex)`
+- _..._
 
 
 ### TermVectorsFormat
@@ -189,7 +189,7 @@ Subspace: `("vec")`
 - `(long_doc0, "term", string_field0, bytes_term0, long_pos1)` => `(long_startOffset, long_endOffset, bytes_payload)`
 - `(long_doc0, "term", string_field0, bytes_term1)` => `(long_freq)`
 - _..._
-- `(long_docNum, "field", string_fieldName0)` => `(long_fieldNum, long_numTerms, boolean_hasPositions, boolean_hasOffsets, boolean_hasPayloads)`
+- `(long_doc1, "field", string_fieldName0)` => `(long_fieldNum, long_numTerms, boolean_hasPositions, boolean_hasOffsets, boolean_hasPayloads)`
 - _..._
 
 
