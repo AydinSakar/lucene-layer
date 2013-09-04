@@ -15,7 +15,7 @@ import java.util.EnumSet;
 
 public final class FDBCodec extends FilterCodec
 {
-    static final String CONFIG_PROP_NAME = "fdbcodec.formats";
+    static final String CONFIG_PROP_NAME = "FDBCodec.formats";
     static final String CONFIG_VALUE_ALL = "ALL";
     static final String CONFIG_VALUE_NONE = "NONE";
     static final String CONFIG_VALUE_DEFAULT = "DEFAULT";
@@ -119,7 +119,7 @@ public final class FDBCodec extends FilterCodec
             return EnumSet.of(
                     FormatOpts.DOC_VALUES,
                     FormatOpts.FIELD_INFOS,
-                    //FormatOpts.LIVE_DOCS,
+                    FormatOpts.LIVE_DOCS,
                     FormatOpts.NORMS,
                     FormatOpts.POSTINGS,
                     FormatOpts.SEGMENT_INFO,

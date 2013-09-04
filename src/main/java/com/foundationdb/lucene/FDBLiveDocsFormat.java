@@ -21,13 +21,14 @@ import java.util.Collection;
 //
 public class FDBLiveDocsFormat extends LiveDocsFormat
 {
-    private static final String LIVEDOCS_EXTENSION = "liv";
-    private static final byte[] EMPTY_BYTES = new byte[0];
+    private static final String LIVE_DOCS_EXTENSION = "liv";
 
 
     @Override
     public MutableBits newLiveDocs(int size) {
-        return new FDBBits(size);
+        FDBBits bits = new FDBBits(size);
+        bits.bitSet.set(0, size);
+        return bits;
     }
 
     @Override
@@ -68,7 +69,7 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
         dir.txn.set(livTuple.pack(), Tuple.from(bits.size).pack());
 
         for(int i = bits.bitSet.nextSetBit(0); i >= 0; i = bits.bitSet.nextSetBit(i + 1)) {
-            dir.txn.set(livTuple.add(i).pack(), EMPTY_BYTES);
+            dir.txn.set(livTuple.add(i).pack(), Util.EMPTY_BYTES);
         }
     }
 
@@ -76,7 +77,7 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
     public void files(SegmentInfoPerCommit info, Collection<String> files) throws IOException {
         // TODO: Needed?
         //if(info.hasDeletions()) {
-        //    files.add(IndexFileNames.fileNameFromGeneration(info.info.name, LIVEDOCS_EXTENSION, info.getDelGen()));
+        //    files.add(IndexFileNames.fileNameFromGeneration(info.info.name, LIVE_DOCS_EXTENSION, info.getDelGen()));
         //}`
     }
 
@@ -86,7 +87,7 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
     //
 
     private static Tuple makeLivTuple(FDBDirectory dir, SegmentInfoPerCommit info) {
-        return dir.subspace.add(info.info.name).add(LIVEDOCS_EXTENSION).add(info.getNextDelGen());
+        return dir.subspace.add(info.info.name).add(LIVE_DOCS_EXTENSION).add(info.getNextDelGen());
     }
 
     // Until a test is found that exercises this;

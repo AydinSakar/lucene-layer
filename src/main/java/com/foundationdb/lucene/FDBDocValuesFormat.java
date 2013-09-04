@@ -314,7 +314,7 @@ public class FDBDocValuesFormat extends DocValuesFormat
                 Tuple docOrdDocTuple = docOrdTuple.add(docID);
                 for(int i = 0; i < ordCount.longValue(); ++i) {
                     long ord = ordIt.next().longValue();
-                    dir.txn.set(docOrdDocTuple.add(ord).pack(), new byte[0]);
+                    dir.txn.set(docOrdDocTuple.add(ord).pack(), Util.EMPTY_BYTES);
                 }
                 ++docID;
             }

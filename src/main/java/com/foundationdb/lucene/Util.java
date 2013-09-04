@@ -24,6 +24,8 @@ public class Util
     public static final String DEFAULT_ROOT_PREFIX = "lucene";
     public static final String DEFAULT_TEST_ROOT_PREFIX = "test_" + DEFAULT_ROOT_PREFIX;
 
+    public static final byte[] EMPTY_BYTES = new byte[0];
+
 
     public static FDBDirectory unwrapDirectory(Directory dir) {
         if(dir instanceof FDBDirectory) {

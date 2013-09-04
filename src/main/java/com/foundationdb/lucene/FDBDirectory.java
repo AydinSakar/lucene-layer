@@ -130,7 +130,7 @@ public class FDBDirectory extends Directory
             nextID = Tuple.fromBytes(kv.getKey()).getLong(dataSubspace.size()) + 1;
         }
         txn.set(dirSubspace.add(name).pack(), Tuple.from(nextID).pack());
-        txn.set(dataSubspace.add(nextID).add(0).pack(), new byte[0]);
+        txn.set(dataSubspace.add(nextID).add(0).pack(), Util.EMPTY_BYTES);
         return nextID;
     }
 
