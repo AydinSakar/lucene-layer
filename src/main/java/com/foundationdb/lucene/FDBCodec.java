@@ -117,10 +117,14 @@ public final class FDBCodec extends FilterCodec
         }
         if(CONFIG_VALUE_DEFAULT.equals(configStr.toUpperCase())) {
             return EnumSet.of(
-                    FormatOpts.DOC_VALUES, FormatOpts.FIELD_INFOS,
+                    FormatOpts.DOC_VALUES,
+                    FormatOpts.FIELD_INFOS,
                     //FormatOpts.LIVE_DOCS,
-                    //FormatOpts.NORMS,
-                    FormatOpts.POSTINGS, FormatOpts.SEGMENT_INFO, FormatOpts.STORED_FIELDS, FormatOpts.TERM_VECTORS
+                    FormatOpts.NORMS,
+                    FormatOpts.POSTINGS,
+                    FormatOpts.SEGMENT_INFO,
+                    FormatOpts.STORED_FIELDS,
+                    FormatOpts.TERM_VECTORS
             );
         }
         EnumSet<FormatOpts> enumSet = EnumSet.noneOf(FormatOpts.class);
