@@ -18,16 +18,29 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+//
+// (dirSubspace, segmentName, "inf", fieldNum, "name") = (fieldName)
+// (dirSubspace, segmentName, "inf", fieldNum, "has_index") = ([0|1])
+// (dirSubspace, segmentName, "inf", fieldNum, "has_payloads") = ([0|1])
+// (dirSubspace, segmentName, "inf", fieldNum, "has_norms") = ([0|1])
+// (dirSubspace, segmentName, "inf", fieldNum, "has_vectors") = ([0|1])
+// (dirSubspace, segmentName, "inf", fieldNum, "doc_values_type") = ("docValuesType")
+// (dirSubspace, segmentName, "inf", fieldNum, "norms_type") = ("normsType")
+// (dirSubspace, segmentName, "inf", fieldNum, "index_options") = ("indexOptions")
+// (dirSubspace, segmentName, "inf", fieldNum, "attr", "attrKey0") = ("attrValue0")
+// (dirSubspace, segmentName, "inf", fieldNum, "attr", "attrKey1") = ("attrValue1")
+// ...
+//
 public class FDBFieldInfosFormat extends FieldInfosFormat
 {
     private static final String FIELD_INFOS_EXTENSION = "inf";
     private static final String NAME = "name";
-    private static final String IS_INDEXED = "indexed";
-    private static final String HAS_VECTORS = "has_vectors";
+    private static final String HAS_INDEX = "has_index";
     private static final String HAS_PAYLOADS = "has_payloads";
     private static final String HAS_NORMS = "has_norms";
-    private static final String NORMS_TYPE = "norms_type";
+    private static final String HAS_VECTORS = "has_vectors";
     private static final String DOC_VALUES_TYPE = "doc_values_type";
+    private static final String NORMS_TYPE = "norms_type";
     private static final String INDEX_OPTIONS = "index_options";
     private static final String ATTR = "attr";
 
@@ -79,7 +92,7 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
                 Tuple value = Tuple.fromBytes(kv.getValue());
                 if(key.equals(NAME)) {
                     info.name = value.getString(0);
-                } else if(key.equals(IS_INDEXED)) {
+                } else if(key.equals(HAS_INDEX)) {
                     info.isIndexed = getBool(value, 0);
                 } else if(key.equals(HAS_VECTORS)) {
                     info.storeTermVector = getBool(value, 0);
@@ -125,7 +138,7 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
             for(FieldInfo fi : infos) {
                 final Tuple fieldTuple = segmentTuple.add(fi.number);
                 set(dir.txn, fieldTuple, NAME, fi.name);
-                set(dir.txn, fieldTuple, IS_INDEXED, fi.isIndexed());
+                set(dir.txn, fieldTuple, HAS_INDEX, fi.isIndexed());
 
                 if(fi.isIndexed()) {
                     assert fi.getIndexOptions().compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS) >= 0 ||
@@ -133,11 +146,11 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
                     set(dir.txn, fieldTuple, INDEX_OPTIONS, fi.getIndexOptions().toString());
                 }
 
-                set(dir.txn, fieldTuple, HAS_VECTORS, fi.hasVectors());
-                set(dir.txn, fieldTuple, HAS_PAYLOADS, fi.hasPayloads());
                 set(dir.txn, fieldTuple, HAS_NORMS, !fi.omitsNorms());
-                set(dir.txn, fieldTuple, NORMS_TYPE, docValuesTypeToString(fi.getNormType()));
+                set(dir.txn, fieldTuple, HAS_PAYLOADS, fi.hasPayloads());
+                set(dir.txn, fieldTuple, HAS_VECTORS, fi.hasVectors());
                 set(dir.txn, fieldTuple, DOC_VALUES_TYPE, docValuesTypeToString(fi.getDocValuesType()));
+                set(dir.txn, fieldTuple, NORMS_TYPE, docValuesTypeToString(fi.getNormType()));
 
                 if(fi.attributes() != null) {
                     Tuple attrTuple = fieldTuple.add(ATTR);
