@@ -7,6 +7,7 @@ import com.foundationdb.Transaction;
 import com.foundationdb.async.Function;
 import com.foundationdb.tuple.ByteArrayUtil;
 import com.foundationdb.tuple.Tuple;
+import org.apache.lucene.index.FieldInfo.DocValuesType;
 import org.apache.lucene.store.CompoundFileDirectory;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
@@ -14,6 +15,7 @@ import org.apache.lucene.util.BytesRef;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -105,6 +107,44 @@ public class Util
         }
         sb.append(')');
         return sb.toString();
+    }
+
+
+    public static boolean getBool(Tuple tuple, int index) {
+        return tuple.getLong(index) == 1;
+    }
+
+    public static void set(Transaction txn, Tuple baseTuple, Object keyPart) {
+        txn.set(baseTuple.addObject(keyPart).pack(), EMPTY_BYTES);
+    }
+
+    public static void set(Transaction txn, Tuple baseTuple, Object keyPart, String value) {
+        txn.set(baseTuple.addObject(keyPart).pack(), Tuple.from(value).pack());
+    }
+
+    public static void set(Transaction txn, Tuple baseTuple, Object keyPart, boolean value) {
+        txn.set(baseTuple.addObject(keyPart).pack(), Tuple.from(value ? 1 : 0).pack());
+    }
+
+    public static void set(Transaction txn, Tuple baseTuple, Object keyPart, long value) {
+        txn.set(baseTuple.addObject(keyPart).pack(), Tuple.from(value).pack());
+    }
+
+    public static void set(Transaction txn, Tuple baseTuple, Object keyPart, BytesRef value) {
+        txn.set(baseTuple.addObject(keyPart).pack(), Tuple.from().add(copyRange(value)).pack());
+    }
+
+    public static void set(Transaction txn, Tuple baseTuple, Object keyPart, Tuple valueTuple) {
+        txn.set(baseTuple.addObject(keyPart).pack(), valueTuple.pack());
+    }
+
+    public static void setMap(Transaction txn, Tuple baseTuple, Map<String, String> map) {
+        if(map == null || map.isEmpty()) {
+            return;
+        }
+        for(Map.Entry<String, String> entry : map.entrySet()) {
+            set(txn, baseTuple, entry.getKey(), entry.getValue());
+        }
     }
 
 

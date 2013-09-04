@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import static com.foundationdb.lucene.Util.set;
+
 //
 // (dirTuple, segmentName, "pst", fieldNum, termBytes, "numDocs") => (atomic_op_num)
 // (dirTuple, segmentName, "pst", fieldNum, termBytes, docID0) => ([termDocFreq])
@@ -461,13 +463,13 @@ public final class FDBPostingsFormat extends PostingsFormat
                 } else {
                     dir.txn.mutate(MutationType.ADD, termTuple.add(NUM_DOCS).pack(), LITTLE_ENDIAN_LONG_ONE);
                 }
+
                 docTuple = termTuple.add(docID);
 
                 Tuple valueTuple = new Tuple();
                 if(indexOptions != IndexOptions.DOCS_ONLY) {
                     valueTuple = valueTuple.add(termDocFreq);
                 }
-
                 dir.txn.set(docTuple.pack(), valueTuple.pack());
             }
 

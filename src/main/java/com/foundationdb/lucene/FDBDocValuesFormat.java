@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
+import static com.foundationdb.lucene.Util.set;
+
 //
 // type=numeric:
 // (dirTuple, segName, segSuffix, ext, fieldName, NUMERIC, docID) => (value0)
@@ -104,6 +106,11 @@ public class FDBDocValuesFormat extends DocValuesFormat
         public void close() {
             // None
         }
+
+
+        //
+        // Helpers
+        //
 
         private class FDBNumericDocValues extends NumericDocValues
         {
@@ -236,38 +243,38 @@ public class FDBDocValuesFormat extends DocValuesFormat
     {
         private final FDBDirectory dir;
         private final Tuple segmentTuple;
-        private final int numDocs;
+        private final int expectedDocs;
 
 
         public FDBDocValuesConsumer(SegmentWriteState state, String ext) throws IOException {
             this.dir = Util.unwrapDirectory(state.directory);
             this.segmentTuple = dir.subspace.add(state.segmentInfo.name).add(state.segmentSuffix).add(ext);
-            this.numDocs = state.segmentInfo.getDocCount();
+            this.expectedDocs = state.segmentInfo.getDocCount();
         }
 
         @Override
         public void addNumericField(FieldInfo field, Iterable<Number> values) {
             assert (field.getDocValuesType() == DocValuesType.NUMERIC || field.getNormType() == DocValuesType.NUMERIC);
             Tuple fieldTuple = segmentTuple.add(field.name).add(DocValuesType.NUMERIC.ordinal());
-            int numDocsWritten = 0;
+            int docNum = 0;
             for(Number n : values) {
                 assert n instanceof Long : n.getClass();
-                dir.txn.set(fieldTuple.add(numDocsWritten).pack(), Tuple.from(n).pack());
-                ++numDocsWritten;
+                set(dir.txn, fieldTuple, docNum, n.longValue());
+                ++docNum;
             }
-            assert numDocs == numDocsWritten : "numDocs=" + this.numDocs + " numDocsWritten=" + numDocsWritten;
+            checkWritten(docNum);
         }
 
         @Override
         public void addBinaryField(FieldInfo field, Iterable<BytesRef> values) {
             assert field.getDocValuesType() == DocValuesType.BINARY;
             Tuple fieldTuple = segmentTuple.add(field.name).add(DocValuesType.BINARY.ordinal());
-            int numDocsWritten = 0;
+            int docNum = 0;
             for(BytesRef value : values) {
-                dir.txn.set(fieldTuple.add(numDocsWritten).pack(), Tuple.from().add(Util.copyRange(value)).pack());
-                ++numDocsWritten;
+                set(dir.txn, fieldTuple, docNum, value);
+                ++docNum;
             }
-            assert numDocs == numDocsWritten;
+            checkWritten(docNum);
         }
 
         @Override
@@ -275,21 +282,23 @@ public class FDBDocValuesFormat extends DocValuesFormat
                                    Iterable<BytesRef> values,
                                    Iterable<Number> docToOrd) throws IOException {
             assert field.getDocValuesType() == DocValuesType.SORTED;
-            Tuple fieldTuple = segmentTuple.add(field.name).add(DocValuesType.SORTED.ordinal());
+            Tuple fieldTuple = segmentTuple.add(field.name).add(field.getDocValuesType().ordinal());
+
             Tuple bytesTuple = fieldTuple.add(BYTES);
             int ordNum = 0;
             for(BytesRef value : values) {
-                dir.txn.set(bytesTuple.add(ordNum).pack(), Tuple.from().add(Util.copyRange(value)).pack());
+                set(dir.txn, bytesTuple, ordNum, value);
                 ++ordNum;
             }
+
             Tuple ordTuple = fieldTuple.add(ORD);
-            int numDocsWritten = 0;
+            int docNum = 0;
             for(Number ord : docToOrd) {
-                long value = ord.longValue();
-                dir.txn.set(ordTuple.add(numDocsWritten).pack(), Tuple.from(value).pack());
-                ++numDocsWritten;
+                set(dir.txn, ordTuple, docNum, ord.longValue());
+                ++docNum;
             }
-            assert numDocs == numDocsWritten : "numDocs=" + this.numDocs + " numDocsWritten=" + numDocsWritten;
+
+            checkWritten(docNum);
         }
 
         @Override
@@ -299,31 +308,38 @@ public class FDBDocValuesFormat extends DocValuesFormat
                                       Iterable<Number> ords) {
             assert field.getDocValuesType() == DocValuesType.SORTED_SET;
 
-            Tuple fieldTuple = segmentTuple.add(field.name).add(DocValuesType.SORTED_SET.ordinal());
+            Tuple fieldTuple = segmentTuple.add(field.name).add(field.getDocValuesType().ordinal());
             Tuple bytesTuple = fieldTuple.add(BYTES);
             int ordNum = 0;
             for(BytesRef value : values) {
-                dir.txn.set(bytesTuple.add(ordNum).pack(), Tuple.from().add(Util.copyRange(value)).pack());
+                set(dir.txn, bytesTuple, ordNum, value);
                 ++ordNum;
             }
 
             Tuple docOrdTuple = fieldTuple.add(DOC_TO_ORD);
-            int docID = 0;
+            int docNum = 0;
             Iterator<Number> ordIt = ords.iterator();
             for(Number ordCount : docToOrdCount) {
-                Tuple docOrdDocTuple = docOrdTuple.add(docID);
+                Tuple docOrdDocTuple = docOrdTuple.add(docNum);
                 for(int i = 0; i < ordCount.longValue(); ++i) {
-                    long ord = ordIt.next().longValue();
-                    dir.txn.set(docOrdDocTuple.add(ord).pack(), Util.EMPTY_BYTES);
+                    long ordinal = ordIt.next().longValue();
+                    set(dir.txn, docOrdDocTuple, ordinal);
                 }
-                ++docID;
+                ++docNum;
             }
-            assert numDocs == docID : "numDocs=" + this.numDocs + " numDocsWritten=" + docID;
+
+            checkWritten(docNum);
         }
 
         @Override
         public void close() throws IOException {
             // None
+        }
+
+        private void checkWritten(int numWritten) {
+            if(numWritten != expectedDocs) {
+                throw new IllegalStateException("Expected " + expectedDocs + " docs to be written but saw " + numWritten);
+            }
         }
     }
 }

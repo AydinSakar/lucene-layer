@@ -1,7 +1,6 @@
 package com.foundationdb.lucene;
 
 import com.foundationdb.KeyValue;
-import com.foundationdb.Transaction;
 import com.foundationdb.tuple.Tuple;
 import org.apache.lucene.codecs.SegmentInfoFormat;
 import org.apache.lucene.codecs.SegmentInfoReader;
@@ -18,6 +17,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import static com.foundationdb.lucene.Util.getBool;
+import static com.foundationdb.lucene.Util.set;
+import static com.foundationdb.lucene.Util.setMap;
 
 //
 // (docSubspace, segmentName, "si", "doc_count") => (docCountNum)
@@ -78,16 +80,15 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
                 Tuple keyTuple = Tuple.fromBytes(kv.getKey());
                 Tuple valueTuple = Tuple.fromBytes(kv.getValue());
                 String key = keyTuple.getString(segmentTuple.size());
-                boolean found = true;
                 if(keyTuple.size() == (segmentTuple.size() + 1)) {
                     if(VERSION.equals(key)) {
                         version = valueTuple.getString(0);
                     } else if(DOC_COUNT.equals(key)) {
                         docCount = (int)valueTuple.getLong(0);
                     } else if(IS_COMPOUND_FILE.equals(key)) {
-                        isCompoundFile = valueTuple.getLong(0) == 1;
+                        isCompoundFile = getBool(valueTuple, 0);
                     } else {
-                        found = false;
+                        notFound(key);
                     }
                 } else if(keyTuple.size() == (segmentTuple.size() + 2)) {
                     if(DIAG.equals(key)) {
@@ -97,13 +98,10 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
                     } else if(FILE.equals(key)) {
                         files.add(keyTuple.getString(segmentTuple.size() + 1));
                     } else {
-                        found = false;
+                        notFound(key);
                     }
                 } else {
-                    found = false;
-                }
-                if(!found) {
-                    throw new IllegalStateException("Unexpected key: " + key);
+                    notFound(key);
                 }
             }
 
@@ -132,6 +130,10 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
             return info;
         }
 
+        private static void notFound(String key) {
+            throw new IllegalStateException("Unexpected key: " + key);
+        }
+
         private static IllegalStateException required(String segmentName, String keyName) {
             return new IllegalStateException("Segment " + segmentName + " missing key: " + keyName);
         }
@@ -149,37 +151,19 @@ public class FDBSegmentInfoFormat extends SegmentInfoFormat
             final Tuple segmentTuple = dir.subspace.add(si.name).add(SEGMENT_INFO_EXT);
 
             set(dir.txn, segmentTuple, DOC_COUNT, si.getDocCount());
-            set(dir.txn, segmentTuple, IS_COMPOUND_FILE, si.getUseCompoundFile() ? 1 : 0);
+            set(dir.txn, segmentTuple, IS_COMPOUND_FILE, si.getUseCompoundFile());
             set(dir.txn, segmentTuple, VERSION, si.getVersion());
 
-            writeMap(dir.txn, segmentTuple.add(DIAG), si.getDiagnostics());
-            writeMap(dir.txn, segmentTuple.add(ATTR), si.attributes());
+            setMap(dir.txn, segmentTuple.add(DIAG), si.getDiagnostics());
+            setMap(dir.txn, segmentTuple.add(ATTR), si.attributes());
 
             Set<String> files = si.files();
             if(files != null && !files.isEmpty()) {
                 Tuple fileTuple = segmentTuple.add(FILE);
                 for(String fileName : files) {
-                    set(dir.txn, fileTuple, fileName, null);
+                    set(dir.txn, fileTuple, fileName);
                 }
             }
-        }
-    }
-
-
-    //
-    // Helpers
-    //
-
-    private static void set(Transaction txn, Tuple baseTuple, String key, Object value) {
-        txn.set(baseTuple.add(key).pack(), Tuple.from(value).pack());
-    }
-
-    private static void writeMap(Transaction txn, Tuple baseTuple, Map<String, String> map) {
-        if(map == null || map.isEmpty()) {
-            return;
-        }
-        for(Map.Entry<String, String> entry : map.entrySet()) {
-            set(txn, baseTuple, entry.getKey(), entry.getValue());
         }
     }
 }

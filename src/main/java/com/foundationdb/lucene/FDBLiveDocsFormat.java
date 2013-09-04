@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.util.BitSet;
 import java.util.Collection;
 
+import static com.foundationdb.lucene.Util.set;
+
 //
 // (livTuple) => (totalSize)
 // (livTuple, setBitIndex0) => []
@@ -65,7 +67,7 @@ public class FDBLiveDocsFormat extends LiveDocsFormat
         dir.txn.set(livTuple.pack(), Tuple.from(bits.size).pack());
 
         for(int i = bits.bitSet.nextSetBit(0); i >= 0; i = bits.bitSet.nextSetBit(i + 1)) {
-            dir.txn.set(livTuple.add(i).pack(), Util.EMPTY_BYTES);
+            set(dir.txn, livTuple, i);
         }
     }
 

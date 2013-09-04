@@ -22,23 +22,30 @@ import java.util.Set;
 
 
 //
-// (dirTuple, segmentName, "fld", docID, 0, fieldNum) => (type, dataIndex)          # "field type" key
+// (dirTuple, segmentName, "fld", docID, 0, fieldNum) => ("typeName", dataIndex)    # "field type" key
 // ...
-// (dirTuple, segmentName, "fld", docID, 1, fieldNum, dataIndex, off0) => (data2)   # "field data" key, part 1
-// (dirTuple, segmentName, "fld", docID, 1, fieldNum, dataIndex, off1) => (data2)   # "field data" key, part 2
+// (dirTuple, segmentName, "fld", docID, 1, fieldNum, dataIndex, off0) => (data0)   # "field data" key, part 0
+// (dirTuple, segmentName, "fld", docID, 1, fieldNum, dataIndex, off1) => (data1)   # "field data" key, part 1
 // ..
 //
 public class FDBStoredFieldsFormat extends StoredFieldsFormat
 {
     private final static String STORED_FIELDS_EXT = "fld";
-    private final static int FIELD_TYPE_SPACE = 0;
-    private final static int FIELD_DATA_SPACE = 1;
+    private final static int FIELD_TYPE_SUBSPACE = 0;
+    private final static int FIELD_DATA_SUBSPACE = 1;
     private final static String TYPE_STRING = "string";
     private final static String TYPE_BINARY = "binary";
     private final static String TYPE_INT = "int";
     private final static String TYPE_LONG = "long";
     private final static String TYPE_FLOAT = "float";
     private final static String TYPE_DOUBLE = "double";
+
+    private static final Set<String> KNOWN_TYPES = new HashSet<String>(
+            Arrays.asList(
+                    TYPE_INT, TYPE_LONG, TYPE_FLOAT, TYPE_DOUBLE, TYPE_BINARY, TYPE_STRING
+            )
+    );
+
 
     private final static int LARGE_VALUE_BLOCK_SIZE = 10000;
 
@@ -64,12 +71,6 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
 
     private static class FDBStoredFieldsReader extends StoredFieldsReader
     {
-        private static final Set<String> KNOWN_TYPES = new HashSet<String>(
-                Arrays.asList(
-                        TYPE_INT, TYPE_LONG, TYPE_FLOAT, TYPE_DOUBLE, TYPE_BINARY, TYPE_STRING
-                )
-        );
-
         private final FDBDirectory dir;
         private final Tuple segmentTuple;
         private final FieldInfos fieldInfos;
@@ -91,7 +92,7 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
         @Override
         public void visitDocument(int docID, StoredFieldVisitor visitor) throws IOException {
             final Tuple docTuple = segmentTuple.add(docID);
-            final Tuple docTypesTuple = segmentTuple.add(docID).add(FIELD_TYPE_SPACE);
+            final Tuple docTypesTuple = segmentTuple.add(docID).add(FIELD_TYPE_SUBSPACE);
 
             for(KeyValue kv : dir.txn.getRange(docTypesTuple.range())) {
                 Tuple keyTuple = Tuple.fromBytes(kv.getKey());
@@ -225,14 +226,15 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
 
             byte[] typeKey = makeFieldTypeTuple(docTuple, info.number).pack();
             byte[] typeValue = dir.txn.get(typeKey).get();
-            long index = 1;
+            long index = 0;
             if(typeValue != null) {
                 index = Tuple.fromBytes(typeValue).getLong(1);
             }
-
             dir.txn.set(typeKey, Tuple.from(type, index).pack());
 
             Tuple dataTuple = makeFieldDataTuple(docTuple, info.number, index);
+            // Clear any old data
+            dir.txn.clear(dataTuple.range());
             Util.writeLargeValue(dir.txn, dataTuple, LARGE_VALUE_BLOCK_SIZE, Tuple.from(value).pack());
         }
 
@@ -263,10 +265,10 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
     //
 
     private static Tuple makeFieldTypeTuple(Tuple docTuple, int fieldNum) {
-        return docTuple.add(FIELD_TYPE_SPACE).add(fieldNum);
+        return docTuple.add(FIELD_TYPE_SUBSPACE).add(fieldNum);
     }
 
     private static Tuple makeFieldDataTuple(Tuple docTuple, int fieldNum, long index) {
-        return docTuple.add(FIELD_DATA_SPACE).add(fieldNum).add(index);
+        return docTuple.add(FIELD_DATA_SUBSPACE).add(fieldNum).add(index);
     }
 }

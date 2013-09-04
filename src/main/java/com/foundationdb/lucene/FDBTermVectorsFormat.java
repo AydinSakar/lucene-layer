@@ -25,6 +25,8 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 
+import static com.foundationdb.lucene.Util.getBool;
+import static com.foundationdb.lucene.Util.set;
 
 //
 // (segmentName, "vec", docNum, "field", fieldName0) => (fieldNum, numTerms, hasPositions, hasOffsets, hasPayloads)
@@ -88,9 +90,9 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
                                 keyTuple.getString(keyTuple.size() - 1),
                                 doc,
                                 (int)valueTuple.getLong(1),
-                                valueTuple.getLong(2) == 1,
-                                valueTuple.getLong(3) == 1,
-                                valueTuple.getLong(4) == 1
+                                getBool(valueTuple, 2),
+                                getBool(valueTuple, 3),
+                                getBool(valueTuple, 4)
                         )
                 );
             }
@@ -355,13 +357,12 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
 
         @Override
         public void addPosition(int position, int startOffset, int endOffset, BytesRef payload) {
-            Transaction txn = dir.txn;
             Tuple valueTuple = Tuple.from(
                     hasOffsets ? startOffset : null,
                     hasOffsets ? endOffset : null,
                     hasPayloads ? Util.copyRange(payload) : null
             );
-            txn.set(termTuple.add(position).pack(), valueTuple.pack());
+            set(dir.txn, termTuple, position, valueTuple);
         }
 
         @Override
@@ -372,7 +373,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
         @Override
         public void finish(FieldInfos fis, int numDocs) {
             if(numDocsWritten != numDocs) {
-                throw new IllegalStateException("Docs written != expected: " + numTermsWritten + " vs " + numDocs);
+                throw new IllegalStateException("Expected " + numDocs + " docs to be written but saw " + numDocsWritten);
             }
         }
 

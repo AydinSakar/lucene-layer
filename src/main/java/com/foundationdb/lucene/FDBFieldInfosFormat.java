@@ -1,7 +1,6 @@
 package com.foundationdb.lucene;
 
 import com.foundationdb.KeyValue;
-import com.foundationdb.Transaction;
 import com.foundationdb.tuple.Tuple;
 import org.apache.lucene.codecs.FieldInfosFormat;
 import org.apache.lucene.codecs.FieldInfosReader;
@@ -17,6 +16,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static com.foundationdb.lucene.Util.getBool;
+import static com.foundationdb.lucene.Util.set;
 
 //
 // (dirSubspace, segmentName, "inf", fieldNum, "name") = (fieldName)
@@ -195,23 +197,12 @@ public class FDBFieldInfosFormat extends FieldInfosFormat
         }
     }
 
-    private static boolean getBool(Tuple tuple, int index) {
-        return tuple.getLong(index) == 1;
-    }
 
-    private static void set(Transaction txn, Tuple tuple, String name, String value) {
-        txn.set(tuple.add(name).pack(), Tuple.from(value).pack());
-    }
-
-    private static void set(Transaction txn, Tuple tuple, String name, boolean value) {
-        txn.set(tuple.add(name).pack(), Tuple.from(value ? 1 : 0).pack());
-    }
-
-    private static DocValuesType stringToDocValuesType(String dvType) {
+    public static DocValuesType stringToDocValuesType(String dvType) {
         return (dvType == null) ? null : DocValuesType.valueOf(dvType);
     }
 
-    private static String docValuesTypeToString(DocValuesType type) {
+    public static String docValuesTypeToString(DocValuesType type) {
         return (type == null) ? null : type.name();
     }
 }
