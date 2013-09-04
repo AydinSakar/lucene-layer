@@ -133,7 +133,7 @@ public class FDBDocValuesFormat extends DocValuesFormat
             public void get(int docID, BytesRef result) {
                 byte[] bytes = dir.txn.get(binaryTuple.add(docID).pack()).get();
                 assert bytes != null : "No bytes for docID: " + docID;
-                result.bytes = Tuple.fromBytes(bytes).getBytes(0);
+                result.bytes = Tuple.fromBytes(bytes).getBytes(0).clone();
                 result.offset = 0;
                 result.length = result.bytes.length;
             }
@@ -158,7 +158,7 @@ public class FDBDocValuesFormat extends DocValuesFormat
             public void lookupOrd(int ord, BytesRef result) {
                 byte[] bytes = dir.txn.get(sortedTuple.add(BYTES).add(ord).pack()).get();
                 assert bytes != null : "No bytes for ord: " + ord;
-                result.bytes = Tuple.fromBytes(bytes).getBytes(0);
+                result.bytes = Tuple.fromBytes(bytes).getBytes(0).clone();
                 result.offset = 0;
                 result.length = result.bytes.length;
             }
@@ -207,7 +207,7 @@ public class FDBDocValuesFormat extends DocValuesFormat
             public void lookupOrd(long ord, BytesRef result) {
                 byte[] bytes = dir.txn.get(sortedSetTuple.add(BYTES).add(ord).pack()).get();
                 assert bytes != null : "No bytes for ord: " + ord;
-                result.bytes = Tuple.fromBytes(bytes).getBytes(0);
+                result.bytes = Tuple.fromBytes(bytes).getBytes(0).clone();
                 result.offset = 0;
                 result.length = result.bytes.length;
             }

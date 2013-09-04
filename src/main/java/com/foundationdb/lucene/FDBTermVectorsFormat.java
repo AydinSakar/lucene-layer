@@ -133,7 +133,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
                     postings.endOffsets[index] = (int)valueTuple.getLong(1);
                 }
                 if(field.hasPayloads) {
-                    postings.payloads[0] = new BytesRef(valueTuple.getBytes(2));
+                    postings.payloads[index] = new BytesRef(valueTuple.getBytes(2).clone());
                 }
                 ++index;
             }
@@ -227,7 +227,7 @@ public class FDBTermVectorsFormat extends TermVectorsFormat
                     KeyValue kv = it.next();
                     Tuple keyTuple = Tuple.fromBytes(kv.getKey());
                     if(keyTuple.size() == (termsTuple.size() + 1)) {
-                        curTerm = new BytesRef(keyTuple.getBytes(keyTuple.size() - 1));
+                        curTerm = new BytesRef(keyTuple.getBytes(keyTuple.size() - 1).clone());
                         curFreq = (int)Tuple.fromBytes(kv.getValue()).getLong(0);
                         break;
                     }

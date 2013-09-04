@@ -135,7 +135,7 @@ public class FDBStoredFieldsFormat extends StoredFieldsFormat
             if(type.equals(TYPE_STRING)) {
                 visitor.stringField(fieldInfo, tupleValue.getString(0));
             } else if(type.equals(TYPE_BINARY)) {
-                visitor.binaryField(fieldInfo, tupleValue.getBytes(0));
+                visitor.binaryField(fieldInfo, tupleValue.getBytes(0).clone());
             } else if(type.equals(TYPE_INT)) {
                 visitor.intField(fieldInfo, (int)tupleValue.getLong(0));
             } else if(type.equals(TYPE_LONG)) {
