@@ -21,14 +21,14 @@ public final class FDBCodec extends FilterCodec
     static final String CONFIG_VALUE_DEFAULT = "DEFAULT";
 
 
-    private final PostingsFormat postings;
     private final DocValuesFormat docValues;
+    private final FieldInfosFormat fieldInfos;
+    private final LiveDocsFormat liveDocs;
+    private final NormsFormat norms;
+    private final PostingsFormat postings;
+    private final SegmentInfoFormat segmentInfo;
     private final StoredFieldsFormat storedFields;
     private final TermVectorsFormat termVectors;
-    private final FieldInfosFormat fieldInfos;
-    private final SegmentInfoFormat segmentInfo;
-    private final NormsFormat norms;
-    private final LiveDocsFormat liveDocs;
 
 
     public FDBCodec() {
@@ -41,14 +41,34 @@ public final class FDBCodec extends FilterCodec
 
     public FDBCodec(EnumSet<FormatOpts> opts) {
         super(FDBCodec.class.getSimpleName(), new Lucene42Codec());
-        this.postings = opts.contains(FormatOpts.POSTINGS) ? new FDBPostingsFormat() : super.postingsFormat();
         this.docValues = opts.contains(FormatOpts.DOC_VALUES) ? new FDBDocValuesFormat() : super.docValuesFormat();
+        this.fieldInfos = opts.contains(FormatOpts.FIELD_INFOS) ? new FDBFieldInfosFormat() : super.fieldInfosFormat();
+        this.liveDocs = opts.contains(FormatOpts.LIVE_DOCS) ? new FDBLiveDocsFormat() : super.liveDocsFormat();
+        this.norms = opts.contains(FormatOpts.NORMS) ? new FDBNormsFormat() : super.normsFormat();
+        this.postings = opts.contains(FormatOpts.POSTINGS) ? new FDBPostingsFormat() : super.postingsFormat();
+        this.segmentInfo = opts.contains(FormatOpts.SEGMENT_INFO) ? new FDBSegmentInfoFormat() : super.segmentInfoFormat();
         this.storedFields = opts.contains(FormatOpts.STORED_FIELDS) ? new FDBStoredFieldsFormat() : super.storedFieldsFormat();
         this.termVectors = opts.contains(FormatOpts.TERM_VECTORS) ? new FDBTermVectorsFormat() : super.termVectorsFormat();
-        this.fieldInfos = opts.contains(FormatOpts.FIELD_INFOS) ? new FDBFieldInfosFormat() : super.fieldInfosFormat();
-        this.segmentInfo = opts.contains(FormatOpts.SEGMENT_INFO) ? new FDBSegmentInfoFormat() : super.segmentInfoFormat();
-        this.norms = opts.contains(FormatOpts.NORMS) ? new FDBNormsFormat() : super.normsFormat();
-        this.liveDocs = opts.contains(FormatOpts.LIVE_DOCS) ? new FDBLiveDocsFormat() : super.liveDocsFormat();
+    }
+
+    @Override
+    public DocValuesFormat docValuesFormat() {
+        return docValues;
+    }
+
+    @Override
+    public FieldInfosFormat fieldInfosFormat() {
+        return fieldInfos;
+    }
+
+    @Override
+    public LiveDocsFormat liveDocsFormat() {
+        return liveDocs;
+    }
+
+    @Override
+    public NormsFormat normsFormat() {
+        return norms;
     }
 
     @Override
@@ -57,8 +77,8 @@ public final class FDBCodec extends FilterCodec
     }
 
     @Override
-    public DocValuesFormat docValuesFormat() {
-        return docValues;
+    public SegmentInfoFormat segmentInfoFormat() {
+        return segmentInfo;
     }
 
     @Override
@@ -68,27 +88,7 @@ public final class FDBCodec extends FilterCodec
 
     @Override
     public TermVectorsFormat termVectorsFormat() {
-      return termVectors;
-    }
-
-    @Override
-    public FieldInfosFormat fieldInfosFormat() {
-        return fieldInfos;
-    }
-
-    @Override
-    public SegmentInfoFormat segmentInfoFormat() {
-        return segmentInfo;
-    }
-
-    @Override
-    public NormsFormat normsFormat() {
-      return norms;
-    }
-
-    @Override
-    public LiveDocsFormat liveDocsFormat() {
-      return liveDocs;
+        return termVectors;
     }
 
 
@@ -98,14 +98,14 @@ public final class FDBCodec extends FilterCodec
 
     private static enum FormatOpts
     {
-        POSTINGS,
         DOC_VALUES,
+        FIELD_INFOS,
+        LIVE_DOCS,
+        NORMS,
+        POSTINGS,
+        SEGMENT_INFO,
         STORED_FIELDS,
         TERM_VECTORS,
-        FIELD_INFOS,
-        SEGMENT_INFO,
-        NORMS,
-        LIVE_DOCS
     }
 
     public static EnumSet<FormatOpts> deriveFormatOpts(String configStr) {
@@ -116,10 +116,12 @@ public final class FDBCodec extends FilterCodec
             return EnumSet.noneOf(FormatOpts.class);
         }
         if(CONFIG_VALUE_DEFAULT.equals(configStr.toUpperCase())) {
-            return EnumSet.of(FormatOpts.POSTINGS, FormatOpts.STORED_FIELDS,
-                              FormatOpts.FIELD_INFOS, FormatOpts.SEGMENT_INFO,
-                              FormatOpts.TERM_VECTORS, //FormatOpts.LIVE_DOCS,
-                              FormatOpts.DOC_VALUES);
+            return EnumSet.of(
+                    FormatOpts.DOC_VALUES, FormatOpts.FIELD_INFOS,
+                    //FormatOpts.LIVE_DOCS,
+                    //FormatOpts.NORMS,
+                    FormatOpts.POSTINGS, FormatOpts.SEGMENT_INFO, FormatOpts.STORED_FIELDS, FormatOpts.TERM_VECTORS
+            );
         }
         EnumSet<FormatOpts> enumSet = EnumSet.noneOf(FormatOpts.class);
         String[] optNames = configStr.split(",");
